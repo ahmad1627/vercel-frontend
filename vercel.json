@@ -2,9 +2,9 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "version": 2,
   "framework": null,
-  "installCommand": "npm install && npm --prefix frontend install",
-  "buildCommand": "npm --prefix frontend install && npm --prefix frontend run build",
-  "outputDirectory": "frontend/dist",
+  "installCommand": "npm install --include=dev && npm --prefix frontend install --include=dev",
+  "buildCommand": "npm --prefix frontend install --include=dev && npm --prefix frontend run build && node -e \"const fs=require('fs'); fs.cpSync('frontend/dist','dist',{recursive:true})\"",
+  "outputDirectory": "dist",
   "functions": {
     "api/index.js": {
       "maxDuration": 30
@@ -12,11 +12,15 @@
   },
   "rewrites": [
     {
-      "source": "/api/:path*",
+      "source": "/api/(.*)",
       "destination": "/api/index.js"
     },
     {
-      "source": "/:path*",
+      "source": "/api",
+      "destination": "/api/index.js"
+    },
+    {
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ],

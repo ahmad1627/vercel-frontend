@@ -7,11 +7,11 @@
     "start": "node backend/server.js",
     "dev:backend": "node backend/server.js",
     "dev:frontend": "npm --prefix frontend run dev",
-    "build": "npm --prefix frontend install && npm --prefix frontend run build",
+    "build": "npm --prefix frontend install --include=dev && npm --prefix frontend run build && node -e \"const fs=require('fs'); fs.cpSync('frontend/dist','dist',{recursive:true})\"",
     "build:frontend": "npm --prefix frontend run build",
     "test:backend": "node backend/test_node_suite.js",
     "test:persistence": "node backend/test_persistence_suite.js",
-    "vercel-build": "npm --prefix frontend install && npm --prefix frontend run build",
+    "vercel-build": "npm --prefix frontend install --include=dev && npm --prefix frontend run build && node -e \"const fs=require('fs'); fs.cpSync('frontend/dist','dist',{recursive:true})\"",
     "test": "npm run test:backend && npm run test:persistence",
     "setup:local": "node scripts/setup-local.js"
   },
