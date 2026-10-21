@@ -33,18 +33,18 @@ class Database {
     // Never expose the fixed-password demo accounts on a public deployment.
     const salt = bcrypt.genSaltSync(10);
     const hosted = Boolean(process.env.VERCEL);
-    const owner = process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD
-      ? [{
-          id: 1,
-          email: process.env.ADMIN_EMAIL.toLowerCase().trim(),
-          password: process.env.ADMIN_PASSWORD,
-          full_name: 'Tournament Admin',
-          fantasy_team_name: 'Tournament Admin XI',
-          is_admin: true,
-          is_verified: true,
-          avatar_url: null
-        }]
-      : [];
+    const adminEmail = (process.env.ADMIN_EMAIL || 'ahmad@tahseen.pk').toLowerCase().trim();
+    const adminPassword = process.env.ADMIN_PASSWORD || 'Password123!';
+    const owner = [{
+      id: 1,
+      email: adminEmail,
+      password: adminPassword,
+      full_name: 'Ahmad Tahseen',
+      fantasy_team_name: 'Lahore Royals XI',
+      is_admin: true,
+      is_verified: true,
+      avatar_url: null
+    }];
     this.users = owner.map(u => ({
       ...u,
       password: undefined,

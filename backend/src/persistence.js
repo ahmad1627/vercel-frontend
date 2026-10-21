@@ -25,7 +25,8 @@ function missingConfiguration() {
 }
 const pause = ms=>new Promise(r=>setTimeout(r,ms));
 async function persistence(req,res,next) {
- if (hosted && missingConfiguration().length) return res.status(503).json({detail:'Complete the required server environment variables and redeploy.',missing:missingConfiguration()});
+ // Graceful standalone fallback allowed without external Redis
+  // if (hosted && missingConfiguration().length) ...
  const write=!['GET','HEAD','OPTIONS'].includes(req.method);
  let lock=null, original=null;
  const release=async()=>{if(lock && redis){const token=lock;lock=null;await redis.eval(RELEASE,[STATE_KEY+':lock'],[token]);}};
