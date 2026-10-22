@@ -17,7 +17,7 @@ if(process.env.TEST_REDIS_MOCK){
 }
 let server,base;let checks=0;
 function ok(condition,label){assert.ok(condition,label);checks++;console.log('PASS:',label);}
-async function start(){const app=require('./src/app');await new Promise(r=>{server=app.listen(0,'127.0.0.1',r);});base=`http://127.0.0.1:${server.address().port}/api`;}
+async function start(){const app=require('../api/_lib/app');await new Promise(r=>{server=app.listen(0,'127.0.0.1',r);});base=`http://127.0.0.1:${server.address().port}/api`;}
 async function restart(){await new Promise(r=>server.close(r));for(const p of Object.keys(require.cache))if(p.includes('/backend/src/'))delete require.cache[p];await start();}
 async function call(method,url,body,token){const r=await fetch(base+url,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body:body==null?undefined:JSON.stringify(body)});return {status:r.status,body:await r.json()};}
 const post=(url,body,token)=>call('POST',url,body,token);const get=(url,token)=>call('GET',url,null,token);
