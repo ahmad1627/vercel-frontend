@@ -1,12 +1,17 @@
 require('./config');
-const { Redis } = require('@upstash/redis');
+let Redis = null;
+try {
+  Redis = require('@upstash/redis').Redis;
+} catch (e) {
+  // @upstash/redis is optional in local or offline environments
+}
 const { randomUUID } = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const db = require('./database');
 const hosted = Boolean(process.env.VERCEL);
 const STATE_KEY = `fantasy-cricket:tri-series:v1:${process.env.GAME_NAMESPACE || process.env.VERCEL_ENV || 'local'}`;
-const hasRedis = Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
+const hasRedis = Boolean(Redis && process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
 const redis = hasRedis ? new Redis({url:process.env.UPSTASH_REDIS_REST_URL,token:process.env.UPSTASH_REDIS_REST_TOKEN,automaticDeserialization:false}) : null;
 const localPath = hosted ? path.join('/tmp', 'game.json') : path.resolve(process.env.LOCAL_DATA_FILE || path.join(__dirname, '../data/game.json'));
 const memoryOnly = process.env.NODE_ENV === 'test' && !process.env.LOCAL_DATA_FILE;
