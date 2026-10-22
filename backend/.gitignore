@@ -1,0 +1,17 @@
+node_modules/
+frontend/node_modules/
+frontend/dist/
+dist/
+.vercel/
+.env
+.env.*
+!.env.example
+!backend/.env.example
+!frontend/.env.example
+backend/*.db
+backend/*.sqlite*
+__pycache__/
+*.pyc
+.DS_Store
+backend/data/
+qa/
