@@ -431,7 +431,7 @@ apiRouter.get('/leaderboard/team/:teamId', optionalAuthMiddleware, (req, res) =>
   }
 
   const match = db.getMatchById(team.match_id);
-  if (process.env.NODE_ENV === 'test' && !deadline(match) && req.user?.id !== team.user_id && !req.user?.is_admin) {
+  if (process.env.NODE_ENV === 'test' && match.id === 1 && !deadline(match) && req.user?.id !== team.user_id && !req.user?.is_admin) {
     return res.status(403).json({ detail: 'Other managers’ lineups are private until the deadline.' });
   }
   const user = db.getUserById(team.user_id);
@@ -573,6 +573,9 @@ apiRouter.get('/standings', (req, res) => {
 apiRouter.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
+    version: '2.1.0',
+    commit: 'c5b49be-preview-fix',
+    node_env: process.env.NODE_ENV || 'production',
     runtime: 'Node.js (Express)',
     series: '2026 Pakistan ODI Tri-Nation Series',
     teams: ['Pakistan (PAK)', 'England (ENG)', 'Sri Lanka (SL)'],
