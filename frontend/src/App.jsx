@@ -479,13 +479,16 @@ function App() {
         myTeamName={user?.fantasy_team_name}
       />
 
-      {/* Admin Simulation Controller Toolbar */}
-      <AdminToolbar
-        activeMatch={activeMatch}
-        onSimulationComplete={loadMatches}
-        onResetComplete={loadMatches}
-        onLockToggle={loadMatches}
-      />
+      {/* Admin Simulation Controller Toolbar (ONLY visible to Ahmad Tahseen / Admin) */}
+      {user?.is_admin && (
+        <AdminToolbar
+          activeMatch={activeMatch}
+          onSimulationComplete={loadMatches}
+          onResetComplete={loadMatches}
+          onLockToggle={loadMatches}
+          onOpenAdminDashboard={() => setActiveTab('admin')}
+        />
+      )}
 
       {/* Main Container */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">

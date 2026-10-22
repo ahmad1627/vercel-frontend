@@ -49,10 +49,19 @@ const AuthModal = ({ isOpen, onClose, onOpenForgotPassword }) => {
     }
   };
 
-  const fillAdminCredentials = () => {
+  const handleQuickAdminLogin = async () => {
     setEmail('ahmad@tahseen.pk');
     setPassword('Password123!');
+    setLoading(true);
     setError(null);
+    try {
+      await login('ahmad@tahseen.pk', 'Password123!');
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Admin login failed.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -173,23 +182,27 @@ const AuthModal = ({ isOpen, onClose, onOpenForgotPassword }) => {
             </button>
           </form>
 
-          {/* Quick Admin Login Shortcut */}
+          {/* Quick 1-Click Admin Login Shortcut */}
           {isLoginTab && (
             <div className="mt-4 pt-3 border-t border-emerald-900/60 text-center">
               <button
                 type="button"
-                onClick={fillAdminCredentials}
-                className="text-[11px] font-bold text-amber-400 hover:text-amber-300 underline flex items-center justify-center gap-1.5 mx-auto transition-colors cursor-pointer"
+                onClick={handleQuickAdminLogin}
+                disabled={loading}
+                className="w-full py-2.5 rounded-xl bg-amber-950/80 hover:bg-amber-900 border border-amber-500/60 text-xs font-black text-amber-300 flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md active:scale-98"
               >
-                <Shield className="w-3.5 h-3.5 text-amber-400" />
-                <span>Fill Tournament Admin Login (Ahmad Tahseen)</span>
+                <Shield className="w-4 h-4 text-amber-400 stroke-[2.5]" />
+                <span>⚡ 1-Click Login as Admin (Ahmad Tahseen)</span>
               </button>
+              <p className="text-[10px] text-slate-400 mt-1.5">
+                Admin access unlocks master lineup locks, score entry & daily winner announcements.
+              </p>
             </div>
           )}
 
           <p className="mt-3 text-center text-[11px] text-slate-400">
             {isLoginTab
-              ? 'Admin access enables lineup locks, score entry & winner announcements.'
+              ? 'Enter your cousin account email and password to view and submit lineups.'
               : 'Your fantasy team and points are saved to the tournament database.'}
           </p>
 

@@ -1,13 +1,14 @@
 import React from 'react';
-import { Trophy, Shield, Calendar, User as UserIcon, LogIn, Lock } from 'lucide-react';
+import { Trophy, Shield, Calendar, User as UserIcon, LogIn } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const MobileBottomNav = ({ activeTab, setActiveTab, onOpenAuth }) => {
   const { user } = useAuth();
+  const isAdmin = Boolean(user?.is_admin);
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 lg:hidden bg-[#031a14]/95 backdrop-blur-md border-t border-emerald-900/80 px-2 py-1 shadow-2xl">
-      <div className="grid grid-cols-5 gap-1">
+      <div className={`grid ${isAdmin ? 'grid-cols-5' : 'grid-cols-4'} gap-1`}>
         <button
           onClick={() => setActiveTab('builder')}
           className={`flex flex-col items-center justify-center py-1.5 rounded-xl transition-all ${
@@ -44,20 +45,20 @@ const MobileBottomNav = ({ activeTab, setActiveTab, onOpenAuth }) => {
           <span className="text-[9px] mt-0.5">Standings</span>
         </button>
 
-        {/* Mobile Admin Button */}
-        <button
-          onClick={() => setActiveTab('admin')}
-          className={`flex flex-col items-center justify-center py-1.5 rounded-xl transition-all ${
-            activeTab === 'admin'
-              ? 'text-amber-400 font-black bg-amber-950/80 border border-amber-500/60'
-              : user?.is_admin
-              ? 'text-amber-300 font-bold'
-              : 'text-slate-400 hover:text-amber-400'
-          }`}
-        >
-          <Shield className="w-5 h-5 text-amber-400" />
-          <span className="text-[9px] mt-0.5">Admin</span>
-        </button>
+        {/* Mobile Admin Button - ONLY visible to Ahmad Tahseen (Admin) */}
+        {isAdmin && (
+          <button
+            onClick={() => setActiveTab('admin')}
+            className={`flex flex-col items-center justify-center py-1.5 rounded-xl transition-all ${
+              activeTab === 'admin'
+                ? 'text-amber-400 font-black bg-amber-950/80 border border-amber-500/60'
+                : 'text-amber-300 font-bold hover:text-amber-400'
+            }`}
+          >
+            <Shield className="w-5 h-5 text-amber-400" />
+            <span className="text-[9px] mt-0.5">Admin</span>
+          </button>
+        )}
 
         <button
           onClick={user ? () => setActiveTab('builder') : onOpenAuth}

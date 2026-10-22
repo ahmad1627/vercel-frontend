@@ -89,18 +89,58 @@ class Database {
     this.playerMatchStats = state.playerMatchStats;
     this.nextUserId = state.nextUserId;
     this.nextTeamId = state.nextTeamId;
+
+    // Guarantee Ahmad Tahseen (Admin) is always in the user list and is always is_admin: true
+    const adminEmail = (process.env.ADMIN_EMAIL || 'ahmad@tahseen.pk').toLowerCase().trim();
+    const adminPassword = process.env.ADMIN_PASSWORD || 'Password123!';
+    let admin = this.users.find(u => u.email && u.email.toLowerCase().trim() === adminEmail);
+    if (!admin) {
+      const salt = bcrypt.genSaltSync(10);
+      admin = {
+        id: 1,
+        email: adminEmail,
+        hashed_password: bcrypt.hashSync(adminPassword, salt),
+        full_name: 'Ahmad Tahseen',
+        fantasy_team_name: 'Lahore Royals XI',
+        is_admin: true,
+        is_verified: true,
+        avatar_url: null,
+        created_at: new Date().toISOString(),
+        reset_token: null,
+        reset_token_expiry: null,
+        oauth_provider: null,
+        oauth_id: null
+      };
+      this.users.unshift(admin);
+    } else {
+      admin.is_admin = true;
+    }
   }
 
   // --- Users ---
   getUserById(id) {
     const numId = parseInt(id, 10);
-    return this.users.find(u => u.id === numId) || null;
+    const user = this.users.find(u => u.id === numId) || null;
+    if (user) {
+      const adminEmail = (process.env.ADMIN_EMAIL || 'ahmad@tahseen.pk').toLowerCase().trim();
+      if (user.email && user.email.toLowerCase().trim() === adminEmail) {
+        user.is_admin = true;
+      }
+    }
+    return user;
   }
 
   getUserByEmail(email) {
     if (!email) return null;
     const clean = email.toLowerCase().trim();
-    return this.users.find(u => u.email && u.email.toLowerCase().trim() === clean) || null;
+    const user = this.users.find(u => u.email && u.email.toLowerCase().trim() === clean) || null;
+    if (user) {
+      const adminEmail = (process.env.ADMIN_EMAIL || 'ahmad@tahseen.pk').toLowerCase().trim();
+      if (clean === adminEmail) {
+        user.is_admin = true;
+      }
+    }
+    return user;
   }
 
   getUserByTeamName(name, excludeUserId = null) {
@@ -122,7 +162,7 @@ class Database {
       full_name: userData.full_name ? userData.full_name.trim() : null,
       fantasy_team_name: userData.fantasy_team_name ? userData.fantasy_team_name.trim() : null,
       avatar_url: userData.avatar_url || null,
-      is_admin: Boolean(userData.is_admin),
+      is_admin: Boolean(userData.is_admin || userData.email.toLowerCase().trim() === (process.env.ADMIN_EMAIL || 'ahmad@tahseen.pk').toLowerCase().trim()),
       is_verified: false,
       oauth_provider: userData.oauth_provider || null,
       oauth_id: userData.oauth_id || null,

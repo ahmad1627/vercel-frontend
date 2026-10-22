@@ -24,7 +24,7 @@ const buttonPrimary = 'rounded-xl bg-linear-to-r from-amber-400 to-amber-500 hov
 const buttonSecondary = 'rounded-xl bg-emerald-900/60 hover:bg-emerald-800/80 border border-emerald-700/80 px-3 py-2 text-emerald-200 font-bold text-xs transition-all active:scale-95 disabled:opacity-40 cursor-pointer flex items-center justify-center gap-1.5';
 const emptyInnings = () => ({ runs: 0, wickets: 0, overs: '0' });
 
-export default function AdminToolbar({ activeMatch, onSimulationComplete, onResetComplete, onLockToggle }) {
+export default function AdminToolbar({ activeMatch, onSimulationComplete, onResetComplete, onLockToggle, onOpenAdminDashboard }) {
   const { user, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const [matches, setMatches] = useState([]);
@@ -306,8 +306,19 @@ export default function AdminToolbar({ activeMatch, onSimulationComplete, onRese
             disabled={busy}
           >
             <Trophy className="w-3.5 h-3.5" />
-            Manage Scores & Fixtures
+            🏆 Enter Scores & Update Points
           </button>
+          {onOpenAdminDashboard && (
+            <button
+              onClick={onOpenAdminDashboard}
+              className={buttonSecondary}
+              disabled={busy}
+              title="Open full admin center dashboard"
+            >
+              <Shield className="w-3.5 h-3.5 text-amber-400" />
+              Full Admin Center
+            </button>
+          )}
         </div>
       </div>
 
