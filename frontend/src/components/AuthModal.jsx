@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Mail, Lock, User, Sparkles, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { X, Mail, Lock, User, Sparkles, AlertCircle, CheckCircle2, Shield } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const EMAIL_REGEX = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/;
@@ -47,6 +47,12 @@ const AuthModal = ({ isOpen, onClose, onOpenForgotPassword }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fillAdminCredentials = () => {
+    setEmail('ahmad@tahseen.pk');
+    setPassword('Password123!');
+    setError(null);
   };
 
   return (
@@ -111,7 +117,7 @@ const AuthModal = ({ isOpen, onClose, onOpenForgotPassword }) => {
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="text-xs font-bold text-slate-300">Password</label>
-                {isLoginTab && <span className="text-[10px] text-slate-500">Forgot password? Contact the tournament admin.</span>}
+                {isLoginTab && <span className="text-[10px] text-slate-500">Contact admin for reset</span>}
               </div>
               <div className="relative">
                 <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -134,7 +140,7 @@ const AuthModal = ({ isOpen, onClose, onOpenForgotPassword }) => {
                     <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
-                      placeholder="e.g. Ahmad Tahseen"
+                      placeholder="e.g. Ali Khan"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
                       className="w-full bg-[#02241b] border border-emerald-900 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
@@ -161,14 +167,30 @@ const AuthModal = ({ isOpen, onClose, onOpenForgotPassword }) => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 rounded-xl bg-linear-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-emerald-950 font-black text-xs uppercase tracking-wider transition-all shadow-lg shadow-amber-500/20 active:scale-98 mt-2"
+              className="w-full py-2.5 rounded-xl bg-linear-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-emerald-950 font-black text-xs uppercase tracking-wider transition-all shadow-lg shadow-amber-500/20 active:scale-98 mt-2 cursor-pointer"
             >
               {loading ? 'Processing...' : isLoginTab ? 'Sign In to Account' : 'Register & Join Tournament'}
             </button>
           </form>
 
-          <p className="mt-4 text-center text-[11px] text-slate-400">
-            Your team and points are saved to the tournament database after you sign in.
+          {/* Quick Admin Login Shortcut */}
+          {isLoginTab && (
+            <div className="mt-4 pt-3 border-t border-emerald-900/60 text-center">
+              <button
+                type="button"
+                onClick={fillAdminCredentials}
+                className="text-[11px] font-bold text-amber-400 hover:text-amber-300 underline flex items-center justify-center gap-1.5 mx-auto transition-colors cursor-pointer"
+              >
+                <Shield className="w-3.5 h-3.5 text-amber-400" />
+                <span>Fill Tournament Admin Login (Ahmad Tahseen)</span>
+              </button>
+            </div>
+          )}
+
+          <p className="mt-3 text-center text-[11px] text-slate-400">
+            {isLoginTab
+              ? 'Admin access enables lineup locks, score entry & winner announcements.'
+              : 'Your fantasy team and points are saved to the tournament database.'}
           </p>
 
         </div>
