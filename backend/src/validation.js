@@ -8,5 +8,13 @@ function avatar(value){
  fail('Use a JPG, PNG, WebP image or HTTPS image URL.');
 }
 function integer(value,name,min=0,max=1000){if(!Number.isSafeInteger(value)||value<min||value>max)fail(`${name} must be a whole number between ${min} and ${max}.`);return value;}
-function deadline(match){return Boolean(match.is_locked||match.status==='LIVE'||match.status==='COMPLETED'||Date.now()>=Date.parse(match.match_date));}
+function deadline(match){
+  if (!match) return false;
+  if (match.status === 'COMPLETED') return true;
+  if (typeof match.is_locked === 'boolean') {
+    if (match.is_locked) return true;
+    if (match.admin_unlocked) return false;
+  }
+  return Boolean(Date.now() >= Date.parse(match.match_date));
+}
 module.exports={fail,text,avatar,integer,deadline};

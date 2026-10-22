@@ -15,4 +15,7 @@ __pycache__/
 *.pyc
 .DS_Store
 backend/data/
+api/data/
+data/
+*.json.tmp
 qa/

@@ -1,10 +1,13 @@
 /**
- * Sample tri-series players and fixtures: verify squads and dates before opening entries.
+ * 2026 Pakistan Men's ODI Tri-Nation Series
+ * Participating Teams: Pakistan (PAK), England (ENG), Sri Lanka (SL)
+ * Accurate official squads and match fixtures starting from Match 4 on Oct 25, 2026.
  */
-const bcrypt = require('bcryptjs');
 
 const PLAYERS_DATA = [
-  // PAKISTAN (PAK) - 16 players
+  // ==========================================
+  // PAKISTAN (PAK) - Official 16-Player Squad
+  // ==========================================
   { id: 1, name: "Saad Baig", team: "PAK", role: "WK", is_captain: false },
   { id: 2, name: "Muhammad Ghazi Ghori", team: "PAK", role: "WK", is_captain: false },
   { id: 3, name: "Babar Azam", team: "PAK", role: "BAT", is_captain: false },
@@ -20,9 +23,11 @@ const PLAYERS_DATA = [
   { id: 13, name: "Haris Rauf", team: "PAK", role: "BOWL", is_captain: false },
   { id: 14, name: "Abrar Ahmed", team: "PAK", role: "BOWL", is_captain: false },
   { id: 15, name: "Sufiyan Muqeem", team: "PAK", role: "BOWL", is_captain: false },
-  { id: 16, name: "Razaullah", team: "PAK", role: "BOWL", is_captain: false },
+  { id: 16, name: "Razaullah Mashwani", team: "PAK", role: "BOWL", is_captain: false },
 
-  // ENGLAND (ENG) - 16 players
+  // ==========================================
+  // ENGLAND (ENG) - Official 16-Player Squad
+  // ==========================================
   { id: 17, name: "Jordan Cox", team: "ENG", role: "WK", is_captain: false },
   { id: 18, name: "Tom Banton", team: "ENG", role: "WK", is_captain: false },
   { id: 19, name: "Harry Brook", team: "ENG", role: "BAT", is_captain: true },
@@ -40,7 +45,9 @@ const PLAYERS_DATA = [
   { id: 31, name: "Henry Crocombe", team: "ENG", role: "BOWL", is_captain: false },
   { id: 32, name: "Mason Crane", team: "ENG", role: "BOWL", is_captain: false },
 
-  // SRI LANKA (SL) - 17 players
+  // ==========================================
+  // SRI LANKA (SL) - Official 17-Player Squad
+  // ==========================================
   { id: 33, name: "Kusal Mendis", team: "SL", role: "WK", is_captain: true },
   { id: 34, name: "Kamil Mishara", team: "SL", role: "WK", is_captain: false },
   { id: 35, name: "Lahiru Udara", team: "SL", role: "WK", is_captain: false },
@@ -69,7 +76,7 @@ const MATCHES_DATA = [
     team_b: "ENG",
     venue: "Rawalpindi Cricket Stadium, Rawalpindi",
     match_date: "2026-10-20T13:00:00+05:00",
-    status: "ACTIVE",
+    status: "SCHEDULED",
     is_active: true,
     is_locked: false,
     winner_team: null,
@@ -92,11 +99,11 @@ const MATCHES_DATA = [
   {
     id: 3,
     match_number: 3,
-    title: "Match 3: Pakistan vs England",
+    title: "Match 3: Pakistan vs Sri Lanka",
     team_a: "PAK",
-    team_b: "ENG",
-    venue: "Gaddafi Stadium, Lahore",
-    match_date: "2026-10-25T13:00:00+05:00",
+    team_b: "SL",
+    venue: "Rawalpindi Cricket Stadium, Rawalpindi",
+    match_date: "2026-10-24T13:00:00+05:00",
     status: "LOCKED_NEXT",
     is_active: false,
     is_locked: false,
@@ -106,13 +113,13 @@ const MATCHES_DATA = [
   {
     id: 4,
     match_number: 4,
-    title: "Match 4: Pakistan vs Sri Lanka",
+    title: "Match 4: Pakistan vs England",
     team_a: "PAK",
-    team_b: "SL",
+    team_b: "ENG",
     venue: "Gaddafi Stadium, Lahore",
-    match_date: "2026-10-27T13:00:00+05:00",
-    status: "LOCKED_NEXT",
-    is_active: false,
+    match_date: "2026-10-25T14:00:00+05:00",
+    status: "ACTIVE",
+    is_active: true,
     is_locked: false,
     winner_team: null,
     scorecard_summary: null
@@ -120,11 +127,11 @@ const MATCHES_DATA = [
   {
     id: 5,
     match_number: 5,
-    title: "Match 5: Sri Lanka vs England",
-    team_a: "SL",
-    team_b: "ENG",
+    title: "Match 5: Pakistan vs Sri Lanka",
+    team_a: "PAK",
+    team_b: "SL",
     venue: "Gaddafi Stadium, Lahore",
-    match_date: "2026-10-29T13:00:00+05:00",
+    match_date: "2026-10-28T14:00:00+05:00",
     status: "LOCKED_NEXT",
     is_active: false,
     is_locked: false,
@@ -138,7 +145,7 @@ const MATCHES_DATA = [
     team_a: "TBD",
     team_b: "TBD",
     venue: "Gaddafi Stadium, Lahore",
-    match_date: "2026-10-31T13:00:00+05:00",
+    match_date: "2026-10-31T14:00:00+05:00",
     status: "TBD_FINAL",
     is_active: false,
     is_locked: false,

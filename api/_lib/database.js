@@ -152,7 +152,10 @@ class Database {
   }
 
   getActiveMatch() {
-    return this.matches.find(m => m.is_active) || this.matches[this.matches.length - 1] || null;
+    const m4 = this.matches.find(m => m.id === 4 && m.is_active && m.status !== 'COMPLETED');
+    const m1Touched = this.matches.find(m => m.id === 1 && (m.score_revision > 0 || (m.is_active && new Date(m.match_date).getTime() > Date.now() + 3600000)));
+    if (m4 && !m1Touched) return m4;
+    return this.matches.find(m => m.is_active && m.status !== 'COMPLETED') || this.matches.find(m => m.is_active) || this.matches[this.matches.length - 1] || null;
   }
 
   updateMatch(id, updates) {
