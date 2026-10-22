@@ -518,7 +518,45 @@ function App() {
       setInspectedTeamDetails(res.data);
       setInspectedTeamId(teamId);
     } catch (err) {
-      setSaveToast({type:'error',text:err.response?.data?.detail||'Could not load lineup.'});
+      if (user && (teamId === user.id || teamId === 'local_' + user.id || String(teamId) === String(user.id)) && selectedPlayers.length === 11) {
+        const categorized = { WK: [], BAT: [], AR: [], BOWL: [] };
+        selectedPlayers.forEach((p) => {
+          const isC = p.id === captainId;
+          const isVc = p.id === viceCaptainId;
+          const mult = isC ? 2.0 : (isVc ? 1.5 : 1.0);
+          const item = {
+            id: p.id,
+            name: p.name,
+            team: p.team,
+            role: p.role,
+            is_captain: isC,
+            is_vice_captain: isVc,
+            multiplier: mult,
+            base_points: 0.0,
+            effective_points: 0.0,
+            stat_summary: { fantasy_points: 0.0, runs: 0, wickets: 0, points_breakdown: {} }
+          };
+          if (categorized[p.role]) categorized[p.role].push(item);
+        });
+        setInspectedTeamDetails({
+          team_id: user.id,
+          fantasy_team_name: user.fantasy_team_name || 'My Fantasy XI',
+          full_name: user.full_name || 'My Team',
+          avatar_url: user.avatar_url,
+          total_points: 0.0,
+          rank: 1,
+          match: {
+            id: selectedMatch?.id || 4,
+            title: selectedMatch?.title || 'Match 4: Pakistan vs England',
+            status: selectedMatch?.status || 'ACTIVE',
+            venue: selectedMatch?.venue || 'Gaddafi Stadium, Lahore'
+          },
+          categorized_players: categorized
+        });
+        setInspectedTeamId(user.id);
+      } else {
+        setSaveToast({ type: 'error', text: err.response?.data?.detail || 'Could not load lineup preview.' });
+      }
     } finally {
       setIsInspecting(false);
     }

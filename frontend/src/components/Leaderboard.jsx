@@ -71,11 +71,23 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam }) => {
 
   // Active match data filtering with strict 1-person-per-email deduplication
   const displayedMatchTeams = React.useMemo(() => {
+    const seenUsers = new Set();
     const seenEmails = new Set();
+    const seenNames = new Set();
+
     const list = matchLeaderboardData.filter((t) => {
-      const emailKey = (t.email || String(t.user_id) || '').toLowerCase().trim();
-      if (emailKey && seenEmails.has(emailKey)) return false;
-      if (emailKey) seenEmails.add(emailKey);
+      const uId = t.user_id ? String(t.user_id) : null;
+      const email = t.email ? t.email.toLowerCase().trim() : null;
+      const teamName = t.fantasy_team_name ? t.fantasy_team_name.toLowerCase().trim() : null;
+
+      // Strict 1 team per user ID, email, or team name
+      if (uId && seenUsers.has(uId)) return false;
+      if (email && seenEmails.has(email)) return false;
+      if (teamName && seenNames.has(teamName)) return false;
+
+      if (uId) seenUsers.add(uId);
+      if (email) seenEmails.add(email);
+      if (teamName) seenNames.add(teamName);
 
       const matchesFilter = filterMyTeamOnly && user ? t.user_id === user.id : true;
       const matchesSearch = searchQuery === '' || 
@@ -84,7 +96,15 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam }) => {
       return matchesFilter && matchesSearch;
     });
 
-    if (user && !seenEmails.has((user.email || String(user.id)).toLowerCase().trim())) {
+    // Check if the current logged in user already has their team listed
+    const isUserAlreadyListed = user && (
+      seenUsers.has(String(user.id)) ||
+      (user.email && seenEmails.has(user.email.toLowerCase().trim())) ||
+      (user.fantasy_team_name && seenNames.has(user.fantasy_team_name.toLowerCase().trim()))
+    );
+
+    // ONLY append fallback if user is definitely NOT in the server leaderboard yet
+    if (user && !isUserAlreadyListed) {
       try {
         const raw = localStorage.getItem('fantasy_squad_m' + selectedMatchId + '_u' + user.id) ||
                     localStorage.getItem('fantasy_squad_m' + selectedMatchId);
@@ -93,7 +113,7 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam }) => {
           if (parsed && Array.isArray(parsed.player_ids) && parsed.player_ids.length === 11) {
             list.push({
               rank: list.length + 1,
-              team_id: 'local_' + user.id,
+              team_id: user.id,
               user_id: user.id,
               is_verified: false,
               fantasy_team_name: user.fantasy_team_name || 'My Fantasy XI',
@@ -112,11 +132,22 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam }) => {
 
   // Overall tournament data filtering with strict 1-person-per-email deduplication
   const displayedOverallTeams = React.useMemo(() => {
+    const seenUsers = new Set();
     const seenEmails = new Set();
+    const seenNames = new Set();
+
     const list = overallData.filter((t) => {
-      const emailKey = (t.email || String(t.user_id) || '').toLowerCase().trim();
-      if (emailKey && seenEmails.has(emailKey)) return false;
-      if (emailKey) seenEmails.add(emailKey);
+      const uId = t.user_id ? String(t.user_id) : null;
+      const email = t.email ? t.email.toLowerCase().trim() : null;
+      const teamName = t.fantasy_team_name ? t.fantasy_team_name.toLowerCase().trim() : null;
+
+      if (uId && seenUsers.has(uId)) return false;
+      if (email && seenEmails.has(email)) return false;
+      if (teamName && seenNames.has(teamName)) return false;
+
+      if (uId) seenUsers.add(uId);
+      if (email) seenEmails.add(email);
+      if (teamName) seenNames.add(teamName);
 
       const matchesFilter = filterMyTeamOnly && user ? t.user_id === user.id : true;
       const matchesSearch = searchQuery === '' ||
@@ -125,13 +156,20 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam }) => {
       return matchesFilter && matchesSearch;
     });
 
-    if (user && !seenEmails.has((user.email || String(user.id)).toLowerCase().trim())) {
+    const isUserAlreadyListed = user && (
+      seenUsers.has(String(user.id)) ||
+      (user.email && seenEmails.has(user.email.toLowerCase().trim())) ||
+      (user.fantasy_team_name && seenNames.has(user.fantasy_team_name.toLowerCase().trim()))
+    );
+
+    if (user && !isUserAlreadyListed) {
       try {
         const raw = localStorage.getItem('fantasy_squad_m4_u' + user.id) || localStorage.getItem('fantasy_squad_m4');
         if (raw) {
           list.push({
             rank: list.length + 1,
             user_id: user.id,
+            team_id: user.id,
             is_verified: false,
             full_name: user.full_name || 'My Team',
             fantasy_team_name: user.fantasy_team_name || 'My Fantasy XI',
@@ -305,7 +343,8 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam }) => {
                   return (
                     <div
                       key={entry.user_id}
-                      className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all hover:bg-emerald-900/40 ${
+                      onClick={() => onInspectTeam && onInspectTeam(entry.team_id || entry.user_id)}
+                      className={`p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all hover:bg-emerald-900/40 cursor-pointer ${
                         isUserTeam ? 'bg-amber-950/30 border-l-4 border-l-amber-400' : ''
                       }`}
                     >
@@ -508,7 +547,7 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam }) => {
                   return (
                     <div
                       key={team.team_id}
-                      onClick={() => onInspectTeam(team.team_id)}
+                      onClick={() => onInspectTeam && onInspectTeam(team.team_id || team.user_id)}
                       className={`p-4 flex items-center justify-between cursor-pointer transition-all hover:bg-emerald-900/40 ${
                         isUserTeam ? 'bg-amber-950/30 border-l-4 border-l-amber-400' : ''
                       }`}

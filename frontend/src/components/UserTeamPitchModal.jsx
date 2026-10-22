@@ -116,7 +116,7 @@ const UserTeamPitchModal = ({ isOpen, onClose, teamDetails, loading }) => {
                 )}
               </div>
               <p className="text-xs text-slate-300">
-                Manager: <strong className="text-amber-300">{full_name}</strong> • Match: {match.title}
+                Manager: <strong className="text-amber-300">{full_name}</strong> • Match: {match?.title || '2026 Pakistan ODI Tri-Series'}
               </p>
             </div>
           </div>
