@@ -30,8 +30,6 @@ function missingConfiguration() {
 }
 const pause = ms=>new Promise(r=>setTimeout(r,ms));
 async function persistence(req,res,next) {
- // Graceful standalone fallback allowed without external Redis
-  // if (hosted && missingConfiguration().length) ...
  const write=!['GET','HEAD','OPTIONS'].includes(req.method);
  let lock=null, original=null;
  const release=async()=>{if(lock && redis){const token=lock;lock=null;await redis.eval(RELEASE,[STATE_KEY+':lock'],[token]);}};
@@ -63,11 +61,31 @@ async function persistence(req,res,next) {
       else if(!memoryOnly){try { fs.mkdirSync(path.dirname(localPath),{recursive:true});const temp=localPath+'.tmp';fs.writeFileSync(temp,updated,{mode:0o600});fs.renameSync(temp,localPath); } catch(fsErr) { console.warn('[Persistence] Notice: Could not write state file:', fsErr.message); }}
      }
      await release();nativeJson(body);
-    }catch(error){await release().catch(()=>{});res.status(503);nativeJson({detail:'Changes could not be confirmed. Reload before retrying.'});}
+    }catch(error){
+     await release().catch(()=>{});
+     if(!hosted && !process.env.TEST_REDIS_MOCK && !memoryOnly){
+      try {
+       fs.mkdirSync(path.dirname(localPath),{recursive:true});
+       const temp=localPath+'.tmp';fs.writeFileSync(temp,updated,{mode:0o600});fs.renameSync(temp,localPath);
+       return nativeJson(body);
+      } catch(e){}
+     }
+     res.status(503);nativeJson({detail:'Changes could not be confirmed. Reload before retrying.'});
+    }
    })();
    return res;
   };
   next();
- }catch(error){await release().catch(()=>{});res.status(503).json({detail:'Game database is unavailable. Please try again shortly.'});}
+ }catch(error){
+  await release().catch(()=>{});
+  if(!hosted && !process.env.TEST_REDIS_MOCK && !memoryOnly){
+   console.warn('[Persistence] Remote database unreachable (offline / internet issue). Falling back to local state:', error.message);
+   try {
+    if(fs.existsSync(localPath)) db.restore(JSON.parse(fs.readFileSync(localPath,'utf8')));
+    return next();
+   } catch (fsErr){}
+  }
+  res.status(503).json({detail:'Game database is unavailable. Please check your internet connection or try again shortly.'});
+ }
 }
 module.exports={persistence,missingConfiguration,redis,STATE_KEY};

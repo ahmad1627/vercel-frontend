@@ -21,7 +21,7 @@ export const AuthProvider = ({ children }) => {
         setUser(res.data); setSessionError('');
       } catch (err) {
         console.error('Failed to restore session:', err);
-        if (![401,403,404].includes(err.response?.status)) setSessionError('Could not restore your session. Reload when your connection is available.');
+        if (![401,403,404].includes(err.response?.status)) setSessionError(err.response?.data?.detail || (err.code === 'ERR_NETWORK' || !err.response ? 'Backend server is not reachable. Start it with "npm run dev".' : 'Could not restore your session. Reload when your connection is available.'));
         if ([401,403,404].includes(err.response?.status)) {
           localStorage.removeItem('fantasy_auth_token'); setToken(null); setUser(null);
         }

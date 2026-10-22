@@ -212,7 +212,7 @@ function App() {
         if (updated) setSelectedMatch(prev=>JSON.stringify(prev)===JSON.stringify(updated)?prev:updated);
       }
     } catch (err) {
-      setLoadError(err.response?.data?.detail || 'Could not load the game. Check your connection and retry.');
+      const msg = err.response?.data?.detail || (err.code === 'ERR_NETWORK' || !err.response ? 'Backend server is not reachable on port 5000. Start it in VS Code with "npm run dev".' : 'Could not load the game. Check your connection and retry.'); setLoadError(msg);
     }
   };
 
