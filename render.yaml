@@ -1,0 +1,21 @@
+# ==============================================================
+# Render.com Blueprint for 100% Free All-in-One Deployment
+# Docs: https://render.com/docs/blueprint-spec
+# ==============================================================
+services:
+  - type: web
+    name: pak-triseries-fantasy-2026
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: npm --prefix frontend install && npm --prefix frontend run build && pip install -r backend/requirements.txt
+    startCommand: cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: NODE_VERSION
+        value: 20.18.0
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        value: "*"

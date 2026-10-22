@@ -10,6 +10,7 @@ dist/
 !frontend/.env.example
 backend/*.db
 backend/*.sqlite*
+backend/fantasy_db.json
 __pycache__/
 *.pyc
 .DS_Store
