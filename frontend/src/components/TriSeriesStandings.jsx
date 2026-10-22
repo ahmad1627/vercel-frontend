@@ -168,11 +168,11 @@ const TriSeriesStandings = () => {
           <div className="bg-[#02241b] border border-emerald-800 rounded-xl p-3">
             <div className="flex justify-between font-bold text-amber-300 mb-1">
               <span>Match 3 • Thu 22 Oct</span>
-              <span className="text-blue-400">ENG WON</span>
+              <span className="text-amber-400">SL WON</span>
             </div>
             <p className="text-white font-medium">England 429/4 (50.0 ov)</p>
-            <p className="text-slate-300">Sri Lanka 240 all out (41.2 ov)</p>
-            <p className="text-[11px] text-amber-300/80 mt-1">ENG won by 189 runs (Brook 202*)</p>
+            <p className="text-slate-300">Sri Lanka 430/8 (49.5 ov)</p>
+            <p className="text-[11px] text-emerald-300/80 mt-1">SL won by 2 wickets (Record Chase)</p>
           </div>
         </div>
       </div>

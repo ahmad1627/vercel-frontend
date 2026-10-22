@@ -104,10 +104,10 @@ const TeamBuilder = ({
 
         <div>
           <span className="text-[10px] font-black uppercase tracking-wider text-amber-300 bg-amber-950/90 px-3 py-1 rounded-full border border-amber-500/50">
-            FIXTURE LOCKED UNTIL {formatFutureDate(selectedMatch.match_date)}
+            {selectedMatch.match_number === 7 ? 'THE GRAND FINAL (TOP 1 VS TOP 2) • GADDAFI STADIUM' : `FIXTURE LOCKED UNTIL ${formatFutureDate(selectedMatch.match_date)}`}
           </span>
           <h2 className="text-xl sm:text-2xl font-black text-white mt-3">
-            {teamA} vs {teamB} (Game {selectedMatch.match_number})
+            {selectedMatch.match_number === 7 ? 'The Final: Top 1 vs Top 2 (Lahore)' : `${teamA} vs ${teamB} (Game ${selectedMatch.match_number})`}
           </h2>
           <p className="text-xs text-emerald-300 font-semibold mt-1">
             {selectedMatch.venue} • Scheduled: {formatFutureDate(selectedMatch.match_date)} at {new Date(selectedMatch.match_date).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}

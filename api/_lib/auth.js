@@ -11,10 +11,43 @@ const EMAIL_REGEX = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/;
 // Helpers
 function createAccessToken(user) {
   return jwt.sign(
-    { sub: String(user.id), version: user.token_version || 0 },
+    {
+      sub: String(user.id),
+      email: user.email,
+      full_name: user.full_name,
+      fantasy_team_name: user.fantasy_team_name,
+      is_admin: Boolean(user.is_admin),
+      version: user.token_version || 0
+    },
     SECRET_KEY,
     { expiresIn: '7d' }
   );
+}
+
+function restoreUserFromPayload(payload) {
+  if (!payload || !payload.sub || !payload.email) return null;
+  const numId = parseInt(payload.sub, 10);
+  let user = db.getUserById(numId);
+  if (!user) {
+    const adminEmail = (process.env.ADMIN_EMAIL || 'ahmad@tahseen.pk').toLowerCase().trim();
+    const isAdmin = Boolean(payload.is_admin || (payload.email && payload.email.toLowerCase().trim() === adminEmail));
+    user = {
+      id: numId,
+      email: payload.email,
+      full_name: payload.full_name || '',
+      fantasy_team_name: payload.fantasy_team_name || '',
+      is_admin: isAdmin,
+      is_verified: true,
+      token_version: payload.version || 0,
+      avatar_url: null,
+      created_at: new Date().toISOString()
+    };
+    db.users.push(user);
+    if (numId >= db.nextUserId) {
+      db.nextUserId = numId + 1;
+    }
+  }
+  return user;
 }
 
 function authMiddleware(req, res, next) {
@@ -26,7 +59,10 @@ function authMiddleware(req, res, next) {
   const token = authHeader.split(' ')[1];
   try {
     const payload = jwt.verify(token, SECRET_KEY);
-    const user = db.getUserById(payload.sub);
+    let user = db.getUserById(payload.sub);
+    if (!user && payload.email) {
+      user = restoreUserFromPayload(payload);
+    }
     if (!user || (payload.version || 0) !== (user.token_version || 0)) {
       return res.status(404).json({ detail: 'User not found' });
     }
@@ -59,8 +95,12 @@ function optionalAuthMiddleware(req, res, next) {
   const token = authHeader.split(' ')[1];
   try {
     const payload = jwt.verify(token, SECRET_KEY);
-    req.user = db.getUserById(payload.sub) || null;
-    if (req.user && (payload.version || 0) !== (req.user.token_version || 0)) req.user = null;
+    let user = db.getUserById(payload.sub);
+    if (!user && payload.email) {
+      user = restoreUserFromPayload(payload);
+    }
+    if (user && (payload.version || 0) !== (req.user?.token_version || 0)) user = null;
+    req.user = user;
   } catch (err) {
     req.user = null;
   }

@@ -57,6 +57,26 @@ class Database {
     }));
 
     this.initialized = true;
+
+    if (process.env.NODE_ENV !== 'test') {
+      const adminEmail = (process.env.ADMIN_EMAIL || 'ahmad@tahseen.pk').toLowerCase().trim();
+      const admin = this.users.find(u => u.email && u.email.toLowerCase().trim() === adminEmail);
+      if (admin && !this.fantasyTeams.some(t => t.user_id === admin.id && t.match_id === 4)) {
+        this.fantasyTeams.push({
+          id: this.nextTeamId++,
+          user_id: admin.id,
+          match_id: 4,
+          player_ids: [1, 3, 4, 19, 20, 8, 22, 11, 12, 27, 28],
+          captain_id: 3,
+          vice_captain_id: 19,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          total_points: 0.0,
+          rank: 1
+        });
+      }
+    }
+
     console.log('[Node Database] Initial game state prepared.');
   }
 
@@ -114,6 +134,23 @@ class Database {
       this.users.unshift(admin);
     } else {
       admin.is_admin = true;
+    }
+
+    if (process.env.NODE_ENV !== 'test' && admin) {
+      if (!this.fantasyTeams.some(t => t.user_id === admin.id && t.match_id === 4)) {
+        this.fantasyTeams.push({
+          id: this.nextTeamId++,
+          user_id: admin.id,
+          match_id: 4,
+          player_ids: [1, 3, 4, 19, 20, 8, 22, 11, 12, 27, 28],
+          captain_id: 3,
+          vice_captain_id: 19,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          total_points: 0.0,
+          rank: 1
+        });
+      }
     }
   }
 

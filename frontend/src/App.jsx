@@ -229,20 +229,27 @@ function App() {
   // Load Players for currently selected match
   useEffect(() => {
     if (!selectedMatch) return;
-    let cancelled=false;
+    let cancelled = false;
     setSavedSignature(null); setSelectedPlayers([]); setCaptainId(null); setViceCaptainId(null);
     const fetchPlayers = async () => {
       try {
         const res = await api.get(`/matches/${selectedMatch.id}/players`);
-        if(cancelled)return;
+        if (cancelled) return;
         setCategorizedPlayers(res.data.categorized_players);
         setAllPlayers(res.data.all_players);
+
+        const storageKey = 'fantasy_squad_m' + selectedMatch.id + (user ? '_u' + user.id : '');
+        let cachedSquad = null;
+        try {
+          const raw = localStorage.getItem(storageKey) || localStorage.getItem('fantasy_squad_m' + selectedMatch.id);
+          if (raw) cachedSquad = JSON.parse(raw);
+        } catch (e) {}
 
         // Load existing saved fantasy team if user is logged in
         if (user) {
           try {
             const teamRes = await api.get(`/teams/my-team?match_id=${selectedMatch.id}`);
-            if(cancelled)return;
+            if (cancelled) return;
             if (teamRes.data.has_team && teamRes.data.team) {
               const myTeam = teamRes.data.team;
               // Map team players from all_players
@@ -251,16 +258,61 @@ function App() {
                 return found || p;
               });
               setSelectedPlayers(loadedSquad);
-              setSavedSignature(JSON.stringify([selectedMatch.id,loadedSquad.map(p=>p.id),myTeam.captain_id,myTeam.vice_captain_id]));
+              setSavedSignature(JSON.stringify([selectedMatch.id, loadedSquad.map((p) => p.id), myTeam.captain_id, myTeam.vice_captain_id]));
               setCaptainId(myTeam.captain_id);
               setViceCaptainId(myTeam.vice_captain_id);
+              try {
+                localStorage.setItem(storageKey, JSON.stringify({
+                  match_id: selectedMatch.id,
+                  player_ids: loadedSquad.map((p) => p.id),
+                  captain_id: myTeam.captain_id,
+                  vice_captain_id: myTeam.vice_captain_id
+                }));
+              } catch (e) {}
+            } else if (cachedSquad && Array.isArray(cachedSquad.player_ids) && cachedSquad.player_ids.length === 11) {
+              // Self-heal: serverless container reset, restore lineup from local persistent backup & re-sync
+              const loadedSquad = cachedSquad.player_ids.map((pId) => res.data.all_players.find((ap) => ap.id === pId)).filter(Boolean);
+              if (loadedSquad.length === 11) {
+                setSelectedPlayers(loadedSquad);
+                setSavedSignature(JSON.stringify([selectedMatch.id, loadedSquad.map((p) => p.id), cachedSquad.captain_id, cachedSquad.vice_captain_id]));
+                setCaptainId(cachedSquad.captain_id);
+                setViceCaptainId(cachedSquad.vice_captain_id);
+                // Background auto-resync to repopulate database/leaderboard on new container
+                if (!isCurrentMatchLocked) {
+                  api.post('/teams', {
+                    match_id: selectedMatch.id,
+                    player_ids: cachedSquad.player_ids,
+                    captain_id: cachedSquad.captain_id,
+                    vice_captain_id: cachedSquad.vice_captain_id
+                  }).catch(() => {});
+                }
+              } else {
+                setSelectedPlayers([]);
+                setCaptainId(null);
+                setViceCaptainId(null);
+              }
             } else {
               setSelectedPlayers([]);
               setCaptainId(null);
               setViceCaptainId(null);
             }
           } catch (e) {
+            if (cachedSquad && Array.isArray(cachedSquad.player_ids) && cachedSquad.player_ids.length === 11) {
+              const loadedSquad = cachedSquad.player_ids.map((pId) => res.data.all_players.find((ap) => ap.id === pId)).filter(Boolean);
+              if (loadedSquad.length === 11) {
+                setSelectedPlayers(loadedSquad);
+                setCaptainId(cachedSquad.captain_id);
+                setViceCaptainId(cachedSquad.vice_captain_id);
+              }
+            }
             setLoadError('Could not load your saved team. Your database team has not been removed. Reload before editing.');
+          }
+        } else if (cachedSquad && Array.isArray(cachedSquad.player_ids) && cachedSquad.player_ids.length === 11) {
+          const loadedSquad = cachedSquad.player_ids.map((pId) => res.data.all_players.find((ap) => ap.id === pId)).filter(Boolean);
+          if (loadedSquad.length === 11) {
+            setSelectedPlayers(loadedSquad);
+            setCaptainId(cachedSquad.captain_id);
+            setViceCaptainId(cachedSquad.vice_captain_id);
           }
         } else {
           setSelectedPlayers([]);
@@ -272,7 +324,7 @@ function App() {
       }
     };
     fetchPlayers();
-    return ()=>{cancelled=true;};
+    return () => { cancelled = true; };
   }, [selectedMatch?.id, user?.id]);
 
   // Validate Team Selection in real-time
@@ -433,6 +485,13 @@ function App() {
       await api.post('/teams', payload);
       setSavedSignature(squadSignature);
 
+      // Persist permanently in browser localStorage across all sessions
+      const storageKey = 'fantasy_squad_m' + selectedMatch.id + (user ? '_u' + user.id : '');
+      try {
+        localStorage.setItem(storageKey, JSON.stringify(payload));
+        localStorage.setItem('fantasy_squad_m' + selectedMatch.id, JSON.stringify(payload));
+      } catch (e) {}
+
       setSaveToast({
         type: 'success',
         text: 'Your 11-Player Fantasy Squad has been saved successfully to the server!',
@@ -586,7 +645,7 @@ function App() {
         {activeTab === 'leaderboard' && (
           <Leaderboard
             matches={matches}
-            activeMatchId={selectedMatch?.id || 1}
+            activeMatchId={selectedMatch?.id || 4}
             onInspectTeam={handleInspectTeam}
           />
         )}

@@ -127,12 +127,12 @@ const MATCHES_DATA = [
     is_active: false,
     is_locked: !isTest,
     team_selection_disabled: !isTest,
-    winner_team: isTest ? null : "ENG",
+    winner_team: isTest ? null : "SL",
     result: isTest ? null : "WIN",
-    scorecard_summary: isTest ? null : "England won by 189 runs (ENG 429/4 [Brook 202*] vs SL 240 all out)",
+    scorecard_summary: isTest ? null : "Sri Lanka won by 2 wickets (SL 430/8 in 49.5 ov beat ENG 429/4 in 50 ov)",
     innings: isTest ? null : {
       a: { runs: 429, wickets: 4, overs: "50", balls: 300 },
-      b: { runs: 240, wickets: 10, overs: "41.2", balls: 248 }
+      b: { runs: 430, wickets: 8, overs: "49.5", balls: 299 }
     }
   },
 
@@ -202,9 +202,9 @@ const MATCHES_DATA = [
   {
     id: 7,
     match_number: 7,
-    title: "The Final: Top 1 vs Top 2",
-    team_a: "PAK",
-    team_b: "ENG",
+    title: "The Final: Top 1 vs Top 2 (Lahore)",
+    team_a: "TBD",
+    team_b: "TBD",
     venue: "Gaddafi Stadium, Lahore",
     match_date: "2026-10-31T14:00:00+05:00",
     status: "TBD_FINAL",
@@ -227,9 +227,9 @@ const INITIAL_STANDINGS = isTest ? [
   { team: "ENG", played: 0, won: 0, lost: 0, points: 0, nrr: 0.0 },
   { team: "SL", played: 0, won: 0, lost: 0, points: 0, nrr: 0.0 }
 ] : [
-  { team: "PAK", played: 2, won: 2, lost: 0, tied: 0, no_result: 0, points: 4, nrr: 1.24 },
-  { team: "ENG", played: 2, won: 1, lost: 1, tied: 0, no_result: 0, points: 2, nrr: 0.45 },
-  { team: "SL", played: 2, won: 0, lost: 2, tied: 0, no_result: 0, points: 0, nrr: -1.69 }
+  { team: "PAK", played: 2, won: 2, lost: 0, tied: 0, no_result: 0, points: 4, nrr: 1.240 },
+  { team: "SL", played: 2, won: 1, lost: 1, tied: 0, no_result: 0, points: 2, nrr: -0.200 },
+  { team: "ENG", played: 2, won: 0, lost: 2, tied: 0, no_result: 0, points: 0, nrr: -0.850 }
 ];
 
 module.exports = {

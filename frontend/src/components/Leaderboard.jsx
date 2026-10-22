@@ -10,7 +10,7 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam }) => {
   const [viewMode, setViewMode] = useState('overall');
   
   // Match-specific leaderboard state
-  const [selectedMatchId, setSelectedMatchId] = useState(activeMatchId || 1);
+  const [selectedMatchId, setSelectedMatchId] = useState(activeMatchId || 4);
   const [matchLeaderboardData, setMatchLeaderboardData] = useState([]);
   const [matchInfo, setMatchInfo] = useState(null);
   
@@ -72,7 +72,7 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam }) => {
   // Active match data filtering with strict 1-person-per-email deduplication
   const displayedMatchTeams = React.useMemo(() => {
     const seenEmails = new Set();
-    return matchLeaderboardData.filter((t) => {
+    const list = matchLeaderboardData.filter((t) => {
       const emailKey = (t.email || String(t.user_id) || '').toLowerCase().trim();
       if (emailKey && seenEmails.has(emailKey)) return false;
       if (emailKey) seenEmails.add(emailKey);
@@ -83,12 +83,37 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam }) => {
         (t.full_name && t.full_name.toLowerCase().includes(searchQuery.toLowerCase()));
       return matchesFilter && matchesSearch;
     });
-  }, [matchLeaderboardData, filterMyTeamOnly, searchQuery, user]);
+
+    if (user && !seenEmails.has((user.email || String(user.id)).toLowerCase().trim())) {
+      try {
+        const raw = localStorage.getItem('fantasy_squad_m' + selectedMatchId + '_u' + user.id) ||
+                    localStorage.getItem('fantasy_squad_m' + selectedMatchId);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.player_ids) && parsed.player_ids.length === 11) {
+            list.push({
+              rank: list.length + 1,
+              team_id: 'local_' + user.id,
+              user_id: user.id,
+              is_verified: false,
+              fantasy_team_name: user.fantasy_team_name || 'My Fantasy XI',
+              full_name: user.full_name || 'My Team',
+              avatar_url: user.avatar_url,
+              total_points: 0.0,
+              is_winner: false
+            });
+          }
+        }
+      } catch (e) {}
+    }
+
+    return list;
+  }, [matchLeaderboardData, filterMyTeamOnly, searchQuery, user, selectedMatchId]);
 
   // Overall tournament data filtering with strict 1-person-per-email deduplication
   const displayedOverallTeams = React.useMemo(() => {
     const seenEmails = new Set();
-    return overallData.filter((t) => {
+    const list = overallData.filter((t) => {
       const emailKey = (t.email || String(t.user_id) || '').toLowerCase().trim();
       if (emailKey && seenEmails.has(emailKey)) return false;
       if (emailKey) seenEmails.add(emailKey);
@@ -99,6 +124,27 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam }) => {
         (t.full_name && t.full_name.toLowerCase().includes(searchQuery.toLowerCase()));
       return matchesFilter && matchesSearch;
     });
+
+    if (user && !seenEmails.has((user.email || String(user.id)).toLowerCase().trim())) {
+      try {
+        const raw = localStorage.getItem('fantasy_squad_m4_u' + user.id) || localStorage.getItem('fantasy_squad_m4');
+        if (raw) {
+          list.push({
+            rank: list.length + 1,
+            user_id: user.id,
+            is_verified: false,
+            full_name: user.full_name || 'My Team',
+            fantasy_team_name: user.fantasy_team_name || 'My Fantasy XI',
+            avatar_url: user.avatar_url,
+            matches_played: 1,
+            total_points: 0.0,
+            match_scores: { 4: 0.0 }
+          });
+        }
+      } catch (e) {}
+    }
+
+    return list;
   }, [overallData, filterMyTeamOnly, searchQuery, user]);
 
   const isMatchCompleted = matchInfo?.status === 'COMPLETED';
@@ -247,7 +293,7 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam }) => {
               <div className="py-12 text-center text-sm text-slate-400 space-y-2">
                 <p>No fantasy squads enrolled yet.</p>
                 <p className="text-xs text-amber-400">
-                  Sign up and build your lineup for Game 1 (Pakistan vs England) to enter the Series Championship!
+                  Sign up and build your lineup for Match 4 (Oct 25: Pakistan vs England) to enter the Series Championship!
                 </p>
               </div>
             ) : (
