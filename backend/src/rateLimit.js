@@ -5,7 +5,7 @@ const SCRIPT="local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('EXPIR
 module.exports=async(req,res,next)=>{
  if(req.method!=='POST'||!/^\/auth\/(login|signup)/.test(req.path))return next();
  const window=900, limit=req.path.includes('signup')?10:30;
- const ip=process.env.VERCEL ? (req.headers['x-vercel-forwarded-for']||req.headers['x-forwarded-for']||req.socket.remoteAddress) : req.socket.remoteAddress;
+ const ip = (req.headers && (req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.headers['x-vercel-forwarded-for'])) || (req.socket && req.socket.remoteAddress) || '127.0.0.1';
  const bucket=Math.floor(Date.now()/1000/window);
  const key=`${STATE_KEY}:rate:${createHash('sha256').update(String(ip)+req.path+bucket).digest('hex')}`;
  try{

@@ -17,13 +17,12 @@ const app = express();
 // ==========================================
 // The deployed React frontend and API use the same Vercel domain. Cross-origin
 // access is needed only when developing locally with Vite on port 5173.
-if (!process.env.VERCEL) {
-  app.use(cors({
-    origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-  }));
-}
+app.use(cors({
+  origin: true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 
 app.disable('x-powered-by');
 app.use(express.json({limit:'256kb'}));
@@ -564,7 +563,12 @@ apiRouter.get('/health', (req, res) => {
 });
 
 // Mount the API Router on both '/' and '/api'
-app.use('/api', rateLimit, persistence, apiRouter, (_req,res)=>res.status(404).json({detail:'API route not found.'}));
+app.use('/api', rateLimit, persistence, apiRouter);
+app.use('/', rateLimit, persistence, apiRouter);
+
+app.use((req, res) => {
+  res.status(404).json({ detail: `API route '${req.method} ${req.url}' not found.` });
+});
 
 // ==========================================
 // PRODUCTION STATIC FRONTEND SERVING

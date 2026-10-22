@@ -8,7 +8,7 @@ const hosted = Boolean(process.env.VERCEL);
 const STATE_KEY = `fantasy-cricket:tri-series:v1:${process.env.GAME_NAMESPACE || process.env.VERCEL_ENV || 'local'}`;
 const hasRedis = Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
 const redis = hasRedis ? new Redis({url:process.env.UPSTASH_REDIS_REST_URL,token:process.env.UPSTASH_REDIS_REST_TOKEN,automaticDeserialization:false}) : null;
-const localPath = path.resolve(process.env.LOCAL_DATA_FILE || path.join(__dirname, '../data/game.json'));
+const localPath = hosted ? path.join('/tmp', 'game.json') : path.resolve(process.env.LOCAL_DATA_FILE || path.join(__dirname, '../data/game.json'));
 const memoryOnly = process.env.NODE_ENV === 'test' && !process.env.LOCAL_DATA_FILE;
 const RELEASE = "if redis.call('GET',KEYS[1]) == ARGV[1] then return redis.call('DEL',KEYS[1]) end return 0";
 const COMMIT = `
@@ -55,7 +55,7 @@ async function persistence(req,res,next) {
     try{
      if(changed){
       if(redis){if(await redis.eval(COMMIT,[STATE_KEY,STATE_KEY+':lock'],[original,updated,lock])!==1) throw new Error('Concurrent update; not saved');}
-      else if(!memoryOnly){fs.mkdirSync(path.dirname(localPath),{recursive:true});const temp=localPath+'.tmp';fs.writeFileSync(temp,updated,{mode:0o600});fs.renameSync(temp,localPath);}
+      else if(!memoryOnly){try { fs.mkdirSync(path.dirname(localPath),{recursive:true});const temp=localPath+'.tmp';fs.writeFileSync(temp,updated,{mode:0o600});fs.renameSync(temp,localPath); } catch(fsErr) { console.warn('[Persistence] Notice: Could not write state file:', fsErr.message); }}
      }
      await release();nativeJson(body);
     }catch(error){await release().catch(()=>{});res.status(503);nativeJson({detail:'Changes could not be confirmed. Reload before retrying.'});}
