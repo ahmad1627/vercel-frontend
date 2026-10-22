@@ -5,12 +5,6 @@
   "installCommand": "npm install --include=dev && npm --prefix frontend install --include=dev",
   "buildCommand": "npm --prefix frontend install --include=dev && npm --prefix frontend run build && node -e \"const fs=require('fs'); fs.cpSync('frontend/dist','dist',{recursive:true})\"",
   "outputDirectory": "dist",
-  "functions": {
-    "api/index.js": {
-      "includeFiles": "api/**",
-      "maxDuration": 30
-    }
-  },
   "rewrites": [
     {
       "source": "/api/(.*)",
