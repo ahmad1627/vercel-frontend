@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from './components/Navbar';
 import AdminToolbar from './components/AdminToolbar';
+import AdminDashboard from './components/AdminDashboard';
 import FixtureCarousel from './components/FixtureCarousel';
 import TeamBuilder from './components/TeamBuilder';
 import PitchPreview from './components/PitchPreview';

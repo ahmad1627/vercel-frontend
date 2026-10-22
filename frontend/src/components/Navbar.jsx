@@ -97,6 +97,31 @@ const Navbar = ({ activeTab, setActiveTab, onOpenAuth, onOpenProfile, onOpenRule
               <Award className="w-3.5 h-3.5 text-amber-400" />
               Scoring Rules
             </button>
+
+            {/* DEDICATED ADMIN PANEL TAB - PROMINENT & UNMISSABLE */}
+            <button
+              onClick={() => setActiveTab('admin')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 border shadow-sm ${
+                activeTab === 'admin'
+                  ? 'bg-amber-400 text-emerald-950 border-amber-300 ring-2 ring-amber-400/50'
+                  : user?.is_admin
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/50 hover:bg-amber-500/30'
+                  : 'bg-emerald-950/80 text-amber-400 border-amber-500/40 hover:bg-emerald-900/60'
+              }`}
+              title="Tournament Super Admin: Lock lineups, enter scores, finalize results"
+            >
+              <Shield className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>Admin Panel</span>
+              {user?.is_admin ? (
+                <span className="bg-amber-400 text-emerald-950 font-black text-[9px] px-1 rounded-full animate-pulse">
+                  ACTIVE
+                </span>
+              ) : (
+                <span className="bg-amber-950 text-amber-300 font-bold text-[9px] px-1 rounded-full border border-amber-500/40">
+                  LOGIN
+                </span>
+              )}
+            </button>
           </nav>
 
           {/* User Profile / Auth State */}

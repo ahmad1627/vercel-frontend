@@ -36,6 +36,62 @@ const TeamBuilder = ({
   };
 
   // =========================================================================
+  // CASE 0: PRE-25 OCT RAWALPINDI MATCHES (MATCHES 1 TO 3) - TEAM SELECTION DISABLED
+  // =========================================================================
+  const isPreOct25Match = selectedMatch && (
+    selectedMatch.match_number < 4 ||
+    selectedMatch.team_selection_disabled ||
+    new Date(selectedMatch.match_date) < new Date('2026-10-25T00:00:00+05:00')
+  );
+
+  if (isPreOct25Match) {
+    return (
+      <div className="flex flex-col bg-[#031a14] border-2 border-emerald-800/80 rounded-2xl p-6 sm:p-10 text-center space-y-5 shadow-2xl">
+        <div className="w-16 h-16 rounded-2xl bg-amber-400/10 border-2 border-amber-400/80 flex items-center justify-center mx-auto shadow-lg shadow-amber-400/10">
+          <CheckCircle2 className="w-8 h-8 text-amber-400" />
+        </div>
+
+        <div>
+          <span className="text-[10px] font-black uppercase tracking-wider text-amber-300 bg-amber-950/90 px-3 py-1 rounded-full border border-amber-500/50">
+            RAWALPINDI LEG • MATCH {selectedMatch.match_number} (COMPLETED)
+          </span>
+          <h2 className="text-xl sm:text-2xl font-black text-white mt-3">
+            {teamA} vs {teamB} (Game {selectedMatch.match_number})
+          </h2>
+          <p className="text-xs text-amber-300 font-bold mt-1">
+            {selectedMatch.scorecard_summary || `Finished in Rawalpindi • Won by ${selectedMatch.winner_team || teamA}`}
+          </p>
+          <p className="text-xs text-emerald-400 font-medium mt-1">
+            {selectedMatch.venue} • {formatFutureDate(selectedMatch.match_date)}
+          </p>
+        </div>
+
+        <div className="bg-[#02241b] border-2 border-amber-500/40 rounded-xl p-4 max-w-lg mx-auto text-xs text-slate-300 space-y-2">
+          <p className="font-bold text-amber-300 flex items-center justify-center gap-1.5 text-sm">
+            <Lock className="w-4 h-4 text-amber-400" />
+            <span>Team Selection Closed for Matches Before October 25</span>
+          </p>
+          <p className="text-[11px] text-slate-300 leading-relaxed">
+            The Tri-Series Fantasy League officially starts with <strong className="text-white">Match 4: Pakistan vs England on Sunday, October 25, 2026 at Gaddafi Stadium, Lahore</strong>. Squad selection is disabled for all matches played before October 25.
+          </p>
+        </div>
+
+        {activeMatch && (
+          <div className="pt-2">
+            <button
+              onClick={() => onSelectMatch && onSelectMatch(activeMatch)}
+              className="px-6 py-3.5 rounded-xl bg-linear-to-r from-amber-400 via-amber-500 to-amber-400 hover:from-amber-300 hover:to-amber-500 text-emerald-950 font-black text-xs uppercase tracking-wider transition-all shadow-xl shadow-amber-400/20 active:scale-95 flex items-center gap-2 mx-auto cursor-pointer"
+            >
+              <span>👉 Switch to Match 4 (Oct 25: PAK vs ENG) to Build Squad</span>
+              <ArrowRight className="w-4 h-4 stroke-[3]" />
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // =========================================================================
   // CASE 1: FUTURE FIXTURE LOCKED VIEW (Matches whose scheduled date has not arrived)
   // =========================================================================
   const isFutureLocked = selectedMatch && !selectedMatch.is_active && selectedMatch.status !== 'COMPLETED';

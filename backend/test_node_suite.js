@@ -60,12 +60,12 @@ async function main(){try{
  r=await post('/admin/matches/1/stats',{...result,stats,revision:2},admin);ok(r.status===200,'Completed result can be corrected');
  r=await get('/teams/my-team?match_id=1',token);ok(r.body.team.total_points>initialPoints,'Correction recalculates team points');
  r=await get('/standings');ok(r.body.find(s=>s.team==='PAK').played===1,'Correction does not double-count standings');
- for(let id=2;id<=6;id++){
+ for(let id=2;id<=7;id++){
   await post('/admin/toggle-lock/'+id,{},admin);d=(await get(`/admin/matches/${id}/stats`,admin)).body;
   const blank=d.players.map(p=>({player_id:p.id,played_xi:false,dismissed:false}));
   r=await post(`/admin/matches/${id}/stats`,{stats:blank,revision:0,finalize:true,result:'NO_RESULT'},admin);assert.equal(r.status,200,JSON.stringify(r.body));
  }
- r=await get('/leaderboard/overall');ok(r.body.is_series_concluded&&r.body.leaderboard.every(t=>t.is_champion),'All six fixtures complete; tied champions supported');
+ r=await get('/leaderboard/overall');ok(r.body.is_series_concluded&&r.body.leaderboard.every(t=>t.is_champion),'All seven fixtures complete; tied champions supported');
  const score=require('./src/scoringEngine');r=score.calculatePlayerFantasyPoints({played_xi:true,overs_bowled:5.5,runs_conceded:20},'BOWL');ok(r.breakdown.economy_rate_value===3.43&&r.breakdown.economy_bonus===4,'Partial-over economy is correct');
  ok(score.calculatePlayerFantasyPoints({played_xi:false,runs:100},'BAT').points===0,'Non-playing player gets zero');
  assert.throws(()=>score.oversToBalls('5.6'));ok(true,'Invalid cricket overs rejected');

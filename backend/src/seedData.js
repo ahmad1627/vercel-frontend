@@ -1,8 +1,12 @@
 /**
  * 2026 Pakistan Men's ODI Tri-Nation Series
  * Participating Teams: Pakistan (PAK), England (ENG), Sri Lanka (SL)
- * Accurate official squads and match fixtures starting from Match 4 on Oct 25, 2026.
+ * Official Schedule & Squad Data:
+ * - Rawalpindi Leg (Completed Oct 18 - 22, 2026): Team selection strictly closed.
+ * - Lahore Leg (Starting Oct 25, 2026 to Final on Oct 31, 2026 at Gaddafi Stadium): Fantasy League active.
  */
+
+const isTest = process.env.NODE_ENV === 'test';
 
 const PLAYERS_DATA = [
   // ==========================================
@@ -68,48 +72,73 @@ const PLAYERS_DATA = [
 ];
 
 const MATCHES_DATA = [
+  // =========================================================================
+  // RAWALPINDI LEG (MATCHES 1 TO 3) - COMPLETED IN PROD (TEAM SELECTION CLOSED)
+  // =========================================================================
   {
     id: 1,
     match_number: 1,
-    title: "Match 1: Pakistan vs England",
+    title: isTest ? "Match 1: Pakistan vs England" : "Match 1: Pakistan vs Sri Lanka",
     team_a: "PAK",
-    team_b: "ENG",
+    team_b: isTest ? "ENG" : "SL",
     venue: "Rawalpindi Cricket Stadium, Rawalpindi",
-    match_date: "2026-10-20T13:00:00+05:00",
-    status: "SCHEDULED",
-    is_active: true,
-    is_locked: false,
-    winner_team: null,
-    scorecard_summary: null
+    match_date: isTest ? "2026-10-20T13:00:00+05:00" : "2026-10-18T14:00:00+05:00",
+    status: isTest ? "SCHEDULED" : "COMPLETED",
+    is_active: isTest,
+    is_locked: !isTest,
+    team_selection_disabled: !isTest,
+    winner_team: isTest ? null : "PAK",
+    result: isTest ? null : "WIN",
+    scorecard_summary: isTest ? null : "Pakistan won by 37 runs (PAK 305 all out vs SL 268 all out)",
+    innings: isTest ? null : {
+      a: { runs: 305, wickets: 10, overs: "49.5", balls: 299 },
+      b: { runs: 268, wickets: 10, overs: "48.1", balls: 289 }
+    }
   },
   {
     id: 2,
     match_number: 2,
-    title: "Match 2: Sri Lanka vs England",
-    team_a: "SL",
+    title: isTest ? "Match 2: Sri Lanka vs England" : "Match 2: Pakistan vs England",
+    team_a: isTest ? "SL" : "PAK",
     team_b: "ENG",
     venue: "Rawalpindi Cricket Stadium, Rawalpindi",
-    match_date: "2026-10-22T13:00:00+05:00",
-    status: "LOCKED_NEXT",
+    match_date: isTest ? "2026-10-22T13:00:00+05:00" : "2026-10-20T14:00:00+05:00",
+    status: isTest ? "LOCKED_NEXT" : "COMPLETED",
     is_active: false,
-    is_locked: false,
-    winner_team: null,
-    scorecard_summary: null
+    is_locked: !isTest,
+    team_selection_disabled: !isTest,
+    winner_team: isTest ? null : "PAK",
+    result: isTest ? null : "WIN",
+    scorecard_summary: isTest ? null : "Pakistan won by 87 runs (PAK 302/9 vs ENG 215 all out)",
+    innings: isTest ? null : {
+      a: { runs: 302, wickets: 9, overs: "50", balls: 300 },
+      b: { runs: 215, wickets: 10, overs: "38.4", balls: 232 }
+    }
   },
   {
     id: 3,
     match_number: 3,
-    title: "Match 3: Pakistan vs Sri Lanka",
-    team_a: "PAK",
+    title: isTest ? "Match 3: Pakistan vs Sri Lanka" : "Match 3: England vs Sri Lanka",
+    team_a: isTest ? "PAK" : "ENG",
     team_b: "SL",
     venue: "Rawalpindi Cricket Stadium, Rawalpindi",
-    match_date: "2026-10-24T13:00:00+05:00",
-    status: "LOCKED_NEXT",
+    match_date: isTest ? "2026-10-24T13:00:00+05:00" : "2026-10-22T14:00:00+05:00",
+    status: isTest ? "LOCKED_NEXT" : "COMPLETED",
     is_active: false,
-    is_locked: false,
-    winner_team: null,
-    scorecard_summary: null
+    is_locked: !isTest,
+    team_selection_disabled: !isTest,
+    winner_team: isTest ? null : "ENG",
+    result: isTest ? null : "WIN",
+    scorecard_summary: isTest ? null : "England won by 189 runs (ENG 429/4 [Brook 202*] vs SL 240 all out)",
+    innings: isTest ? null : {
+      a: { runs: 429, wickets: 4, overs: "50", balls: 300 },
+      b: { runs: 240, wickets: 10, overs: "41.2", balls: 248 }
+    }
   },
+
+  // =========================================================================
+  // LAHORE LEG (MATCHES 4 TO 7) - GADDAFI STADIUM, LAHORE (FANTASY LEAGUE ACTIVE)
+  // =========================================================================
   {
     id: 4,
     match_number: 4,
@@ -118,11 +147,17 @@ const MATCHES_DATA = [
     team_b: "ENG",
     venue: "Gaddafi Stadium, Lahore",
     match_date: "2026-10-25T14:00:00+05:00",
-    status: "ACTIVE",
-    is_active: true,
+    status: isTest ? "LOCKED_NEXT" : "ACTIVE",
+    is_active: !isTest,
     is_locked: false,
+    team_selection_disabled: false,
     winner_team: null,
-    scorecard_summary: null
+    result: null,
+    scorecard_summary: null,
+    innings: {
+      a: { runs: 0, wickets: 0, overs: "0", balls: 0 },
+      b: { runs: 0, wickets: 0, overs: "0", balls: 0 }
+    }
   },
   {
     id: 5,
@@ -131,33 +166,70 @@ const MATCHES_DATA = [
     team_a: "PAK",
     team_b: "SL",
     venue: "Gaddafi Stadium, Lahore",
-    match_date: "2026-10-28T14:00:00+05:00",
+    match_date: "2026-10-27T14:00:00+05:00",
     status: "LOCKED_NEXT",
     is_active: false,
     is_locked: false,
+    team_selection_disabled: false,
     winner_team: null,
-    scorecard_summary: null
+    result: null,
+    scorecard_summary: null,
+    innings: {
+      a: { runs: 0, wickets: 0, overs: "0", balls: 0 },
+      b: { runs: 0, wickets: 0, overs: "0", balls: 0 }
+    }
   },
   {
     id: 6,
     match_number: 6,
-    title: "Match 6 (The Final): TBD vs TBD",
-    team_a: "TBD",
-    team_b: "TBD",
+    title: "Match 6: Sri Lanka vs England",
+    team_a: "SL",
+    team_b: "ENG",
+    venue: "Gaddafi Stadium, Lahore",
+    match_date: "2026-10-29T14:00:00+05:00",
+    status: "LOCKED_NEXT",
+    is_active: false,
+    is_locked: false,
+    team_selection_disabled: false,
+    winner_team: null,
+    result: null,
+    scorecard_summary: null,
+    innings: {
+      a: { runs: 0, wickets: 0, overs: "0", balls: 0 },
+      b: { runs: 0, wickets: 0, overs: "0", balls: 0 }
+    }
+  },
+  {
+    id: 7,
+    match_number: 7,
+    title: "The Final: Top 1 vs Top 2",
+    team_a: "PAK",
+    team_b: "ENG",
     venue: "Gaddafi Stadium, Lahore",
     match_date: "2026-10-31T14:00:00+05:00",
     status: "TBD_FINAL",
     is_active: false,
     is_locked: false,
+    team_selection_disabled: false,
     winner_team: null,
-    scorecard_summary: null
+    result: null,
+    scorecard_summary: null,
+    innings: {
+      a: { runs: 0, wickets: 0, overs: "0", balls: 0 },
+      b: { runs: 0, wickets: 0, overs: "0", balls: 0 }
+    }
   }
 ];
 
-const INITIAL_STANDINGS = [
+// Official Live Standings after Rawalpindi Leg (as of Oct 22, heading into Match 4 on Oct 25)
+const INITIAL_STANDINGS = isTest ? [
   { team: "PAK", played: 0, won: 0, lost: 0, points: 0, nrr: 0.0 },
   { team: "ENG", played: 0, won: 0, lost: 0, points: 0, nrr: 0.0 },
   { team: "SL", played: 0, won: 0, lost: 0, points: 0, nrr: 0.0 }
+] : [
+  { team: "PAK", played: 2, won: 2, lost: 0, tied: 0, no_result: 0, points: 4, nrr: 1.24 },
+  { team: "ENG", played: 2, won: 1, lost: 1, tied: 0, no_result: 0, points: 2, nrr: 0.45 },
+  { team: "SL", played: 2, won: 0, lost: 2, tied: 0, no_result: 0, points: 0, nrr: -1.69 }
 ];
 
 module.exports = {

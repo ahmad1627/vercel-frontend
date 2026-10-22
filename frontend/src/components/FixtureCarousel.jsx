@@ -23,7 +23,7 @@ const FixtureCarousel = ({ matches, selectedMatch, onSelectMatch }) => {
         weekday: 'short',
         month: 'short',
         day: 'numeric',
-      }) + ' • ' + d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+      }) + ' • ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     } catch {
       return isoString;
     }
@@ -47,27 +47,28 @@ const FixtureCarousel = ({ matches, selectedMatch, onSelectMatch }) => {
         <div className="flex items-center gap-2">
           <Calendar className="w-4 h-4 text-amber-400" />
           <h2 className="text-sm font-bold uppercase tracking-wider text-slate-200">
-            Tournament fixtures — confirm dates with your administrator
+            Official Tri-Series Fixtures (Rawalpindi & Lahore Leg)
           </h2>
         </div>
         <div className="flex items-center gap-2 text-xs">
           <span className="text-emerald-400 font-semibold hidden sm:inline">
-            Rawalpindi & Gaddafi Stadium, Lahore
+            Matches 1-3: Rawalpindi | Matches 4-7: Gaddafi Stadium, Lahore
           </span>
           <span className="px-2 py-0.5 rounded-full bg-emerald-950 border border-emerald-700/80 text-[10px] font-bold text-amber-300">
-            Admin-managed fixtures
+            Fantasy Starts Match 4 (Oct 25)
           </span>
         </div>
       </div>
 
       {/* Horizontal Carousel */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
         {matches.map((m) => {
           const isSelected = selectedMatch && selectedMatch.id === m.id;
           const isMatchActive = m.is_active;
           const isCompleted = m.status === 'COMPLETED';
+          const isPreOct25 = m.match_number < 4;
           const isLocked = m.is_locked || m.status === 'LIVE';
-          const isFinal = m.match_number === 6;
+          const isFinal = m.match_number === 7;
           const teamA = getTeamBadge(m.team_a);
           const teamB = getTeamBadge(m.team_b);
 
@@ -94,8 +95,8 @@ const FixtureCarousel = ({ matches, selectedMatch, onSelectMatch }) => {
                 </span>
 
                 {isCompleted ? (
-                  <span className="text-[10px] font-semibold flex items-center gap-1 text-slate-300 bg-slate-800/80 px-2 py-0.5 rounded-full border border-slate-700">
-                    <CheckCircle2 className="w-3 h-3 text-emerald-400" /> Finished
+                  <span className="text-[9px] font-semibold flex items-center gap-1 text-slate-300 bg-slate-800/80 px-2 py-0.5 rounded-full border border-slate-700">
+                    <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" /> Finished
                   </span>
                 ) : isMatchActive ? (
                   isLocked ? (
@@ -143,11 +144,15 @@ const FixtureCarousel = ({ matches, selectedMatch, onSelectMatch }) => {
                 </div>
               </div>
 
-              {/* Winner Banner if completed */}
+              {/* Winner Banner or Status */}
               {isCompleted && m.winner_team ? (
                 <div className="mt-2 bg-emerald-950 border border-emerald-700/60 rounded px-1.5 py-0.5 text-center text-[10px] font-bold text-amber-300 flex items-center justify-center gap-1">
                   <Trophy className="w-3 h-3 text-amber-400" />
                   <span>Won by {m.winner_team}</span>
+                </div>
+              ) : isPreOct25 ? (
+                <div className="mt-2 bg-slate-950/80 border border-slate-800 rounded px-1.5 py-0.5 text-center text-[9px] font-bold text-slate-400">
+                  Rawalpindi Leg (Closed)
                 </div>
               ) : !isMatchActive && !isCompleted ? (
                 <div className="mt-2 bg-slate-950/70 border border-slate-800 rounded px-1.5 py-0.5 text-center text-[9px] font-bold text-slate-400 flex items-center justify-center gap-1">

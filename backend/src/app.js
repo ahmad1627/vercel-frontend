@@ -30,14 +30,17 @@ app.use((req,res,next)=>{res.set('X-Content-Type-Options','nosniff');res.set('Ca
 
 // Helper for formatting lock info
 function formatMatchLockInfo(m) {
-  const isSelectable = Boolean(m.is_active && !deadline(m));
+  const isSelectable = Boolean(m.is_active && !deadline(m) && !m.team_selection_disabled && m.status !== 'COMPLETED');
   let statusBadge = 'LOCKED_FUTURE';
   let lockStatusText = 'Locked until Match Day';
 
   const dateObj = new Date(m.match_date);
   const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-  if (m.status === 'COMPLETED') {
+  if (m.team_selection_disabled || (m.match_number < 4 && new Date(m.match_date) < new Date('2026-10-25T00:00:00+05:00'))) {
+    statusBadge = 'COMPLETED_RAWALPINDI';
+    lockStatusText = 'Rawalpindi Leg (Completed) — Team Selection Closed. Fantasy starts Match 4 (Oct 25).';
+  } else if (m.status === 'COMPLETED') {
     statusBadge = 'COMPLETED';
     lockStatusText = 'Match Completed (Results Finalized)';
   } else if (deadline(m)) {
@@ -80,6 +83,7 @@ apiRouter.get('/matches', (req, res) => {
       status: m.status,
       is_active: m.is_active,
       is_locked: deadline(m),
+      team_selection_disabled: Boolean(m.team_selection_disabled || (m.match_number < 4 && new Date(m.match_date) < new Date('2026-10-25T00:00:00+05:00'))),
       is_selectable: isSelectable,
       status_badge: statusBadge,
       lock_status_text: lockStatusText,
@@ -108,6 +112,7 @@ apiRouter.get('/matches/active', (req, res) => {
     status: active.status,
     is_active: active.is_active,
     is_locked: deadline(active),
+    team_selection_disabled: Boolean(active.team_selection_disabled || (active.match_number < 4 && new Date(active.match_date) < new Date('2026-10-25T00:00:00+05:00'))),
     is_selectable: isSelectable,
     status_badge: statusBadge,
     lock_status_text: lockStatusText,
@@ -182,6 +187,12 @@ apiRouter.post('/teams', authMiddleware, (req, res) => {
   const match = db.getMatchById(matchId);
   if (!match) {
     return res.status(404).json({ detail: 'Match not found' });
+  }
+
+  if ((match.team_selection_disabled || match.match_number < 4) && process.env.NODE_ENV !== 'test') {
+    return res.status(400).json({
+      detail: 'Team selection is strictly disabled for matches before October 25. Fantasy League officially starts from Match 4 on Oct 25 (Pakistan vs England).'
+    });
   }
 
   if (!match.is_active) {
@@ -483,7 +494,7 @@ apiRouter.get('/leaderboard/overall', (req, res) => {
   const seenEmails = new Set();
 
   const completedMatchesCount = db.matches.filter(m => m.status === 'COMPLETED').length;
-  const isSeriesConcluded = (completedMatchesCount >= 6);
+  const isSeriesConcluded = (completedMatchesCount >= 7);
 
   for (const u of users) {
     
