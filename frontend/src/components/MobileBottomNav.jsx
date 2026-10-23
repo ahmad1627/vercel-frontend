@@ -11,14 +11,17 @@ const MobileBottomNav = ({ activeTab, setActiveTab, onOpenAuth }) => {
       <div className={`grid ${isAdmin ? 'grid-cols-5' : 'grid-cols-4'} gap-1`}>
         <button
           onClick={() => setActiveTab('builder')}
-          className={`flex flex-col items-center justify-center py-1.5 rounded-xl transition-all ${
+          className={`flex flex-col items-center justify-center py-1.5 rounded-xl transition-all relative ${
             activeTab === 'builder'
-              ? 'text-amber-400 font-bold bg-emerald-900/50'
-              : 'text-slate-400 hover:text-slate-200'
+              ? 'text-amber-400 font-black bg-emerald-900/60 ring-1 ring-amber-400/50'
+              : 'text-slate-300 hover:text-white'
           }`}
         >
-          <Shield className="w-5 h-5" />
-          <span className="text-[9px] mt-0.5">My Squad</span>
+          <div className="relative">
+            <Shield className="w-5 h-5 stroke-[2.5]" />
+            <span className="absolute -top-1 -right-2 w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+          </div>
+          <span className="text-[10px] font-extrabold mt-0.5 tracking-tight">Build Team</span>
         </button>
 
         <button
@@ -30,7 +33,7 @@ const MobileBottomNav = ({ activeTab, setActiveTab, onOpenAuth }) => {
           }`}
         >
           <Trophy className="w-5 h-5" />
-          <span className="text-[9px] mt-0.5">Ranks</span>
+          <span className="text-[10px] font-bold mt-0.5 tracking-tight">Leaderboard</span>
         </button>
 
         <button
@@ -42,7 +45,7 @@ const MobileBottomNav = ({ activeTab, setActiveTab, onOpenAuth }) => {
           }`}
         >
           <Calendar className="w-5 h-5" />
-          <span className="text-[9px] mt-0.5">Standings</span>
+          <span className="text-[10px] font-bold mt-0.5 tracking-tight">Standings</span>
         </button>
 
         {/* Mobile Admin Button - ONLY visible to Ahmad Tahseen (Admin) */}

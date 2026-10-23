@@ -152,6 +152,32 @@ class Database {
         slStand.played = 2; slStand.won = 1; slStand.lost = 1; slStand.points = 2; slStand.nrr = -0.200;
         engStand.played = 2; engStand.won = 0; engStand.lost = 2; engStand.points = 0; engStand.nrr = -0.850;
       }
+
+      // Ensure all registered users have a fantasy team entry for Match 4 on leaderboard
+      for (const u of this.users) {
+        if (!u.email || u.email.startsWith('test.manager.')) continue;
+        const hasTeam = this.fantasyTeams.some(t => t.user_id === u.id);
+        if (!hasTeam) {
+          const defaultName = u.full_name || u.email.split('@')[0];
+          const defaultTeamName = u.fantasy_team_name || `${defaultName} XI`;
+          this.fantasyTeams.push({
+            id: this.nextTeamId++,
+            user_id: u.id,
+            match_id: 4,
+            captain_id: null,
+            vice_captain_id: null,
+            player_ids: [],
+            fantasy_team_name: defaultTeamName,
+            full_name: defaultName,
+            user_email: u.email,
+            avatar_url: u.avatar_url || null,
+            total_points: 0.0,
+            rank: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        }
+      }
     }
 
     // Guarantee Ahmad Tahseen (Admin) is always in the user list and is always is_admin: true

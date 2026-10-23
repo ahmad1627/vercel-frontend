@@ -3,7 +3,7 @@ import { Trophy, Medal, Shield, Eye, Calendar, Sparkles, ChevronRight, User as U
 import { useAuth } from '../context/AuthContext';
 import api from '../api';
 
-const Leaderboard = ({ matches, activeMatchId, onInspectTeam }) => {
+const Leaderboard = ({ matches, activeMatchId, onInspectTeam, onBuildTeam }) => {
   const { user } = useAuth();
   
   // View mode: 'overall' | 'match'
@@ -284,6 +284,35 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam }) => {
         </div>
       </div>
 
+      {/* Quick Action Banner: Build Squad for Match 4 */}
+      {onBuildTeam && (
+        <div className="bg-gradient-to-r from-emerald-950 via-[#03291e] to-emerald-950 border border-amber-500/40 rounded-2xl p-4 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-3 text-center sm:text-left">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-amber-500 text-emerald-950 flex items-center justify-center font-black shrink-0 shadow">
+              ⚡
+            </div>
+            <div>
+              <div className="flex items-center gap-2 justify-center sm:justify-start">
+                <span className="text-sm font-black text-white">Fixture 4 (PAK vs ENG) Open for Squads!</span>
+                <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-extrabold text-[10px] border border-emerald-500/40">
+                  Oct 25, 2026
+                </span>
+              </div>
+              <p className="text-xs text-slate-300">
+                All registered players are saved permanently on this leaderboard. Pick your 11 players, Captain &amp; Vice-Captain.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onBuildTeam}
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 via-amber-500 to-amber-400 text-emerald-950 font-black text-xs hover:brightness-110 active:scale-95 transition-all shadow-lg flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+          >
+            <Sparkles className="w-4 h-4 text-emerald-950" />
+            Build / Edit Squad 11
+          </button>
+        </div>
+      )}
+
       {/* Filter and Match Selector Bar */}
       <div className="bg-[#02241b] border border-emerald-900/90 rounded-2xl p-3.5 shadow-md flex flex-wrap items-center justify-between gap-3">
         {/* Search */}
@@ -381,11 +410,19 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam }) => {
                 Loading overall series standings...
               </div>
             ) : displayedOverallTeams.length === 0 ? (
-              <div className="py-12 text-center text-sm text-slate-400 space-y-2">
+              <div className="py-12 text-center text-sm text-slate-400 space-y-3">
                 <p>No fantasy squads enrolled yet.</p>
                 <p className="text-xs text-amber-400">
                   Sign up and build your lineup for Match 4 (Oct 25: Pakistan vs England) to enter the Series Championship!
                 </p>
+                {onBuildTeam && (
+                  <button
+                    onClick={onBuildTeam}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-emerald-950 font-black text-xs hover:brightness-110 shadow-lg cursor-pointer"
+                  >
+                    ⚡ Build Team for Match 4 Now
+                  </button>
+                )}
               </div>
             ) : (
               <div className="divide-y divide-emerald-900/40">
@@ -602,11 +639,19 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam }) => {
                 Loading match standings...
               </div>
             ) : displayedMatchTeams.length === 0 ? (
-              <div className="py-12 text-center text-sm text-slate-400 space-y-2">
+              <div className="py-12 text-center text-sm text-slate-400 space-y-3">
                 <p>No fantasy squads submitted for this fixture yet.</p>
                 <p className="text-xs text-amber-400">
                   Select your 11 players for this game in the Squad Builder to join this leaderboard!
                 </p>
+                {onBuildTeam && (
+                  <button
+                    onClick={onBuildTeam}
+                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-emerald-950 font-black text-xs hover:brightness-110 shadow-lg cursor-pointer"
+                  >
+                    ⚡ Build Team for Match 4 Now
+                  </button>
+                )}
               </div>
             ) : (
               <div className="divide-y divide-emerald-900/40">

@@ -162,6 +162,23 @@ router.post('/signup', (req, res) => {
   });
 
   const token = createAccessToken(newUser);
+
+  if (process.env.NODE_ENV !== 'test') {
+    const defaultName = (full_name && full_name.trim()) || email.split('@')[0];
+    const defaultTeamName = (fantasy_team_name && fantasy_team_name.trim()) || `${defaultName} XI`;
+    db.saveFantasyTeam({
+      userId: newUser.id,
+      matchId: 4,
+      playerIds: [],
+      captainId: null,
+      viceCaptainId: null,
+      fantasyTeamName: defaultTeamName,
+      fullName: defaultName,
+      userEmail: newUser.email,
+      avatarUrl: newUser.avatar_url
+    });
+  }
+
   return res.json({
     access_token: token,
     token_type: 'bearer',
@@ -211,6 +228,26 @@ router.post('/login', (req, res) => {
   }
 
   const token = createAccessToken(user);
+
+  if (process.env.NODE_ENV !== 'test') {
+    const existingTeam = db.getFantasyTeam(user.id, 4);
+    if (!existingTeam) {
+      const defaultName = user.full_name || user.email.split('@')[0];
+      const defaultTeamName = user.fantasy_team_name || `${defaultName} XI`;
+      db.saveFantasyTeam({
+        userId: user.id,
+        matchId: 4,
+        playerIds: [],
+        captainId: null,
+        viceCaptainId: null,
+        fantasyTeamName: defaultTeamName,
+        fullName: defaultName,
+        userEmail: user.email,
+        avatarUrl: user.avatar_url
+      });
+    }
+  }
+
   return res.json({
     access_token: token,
     token_type: 'bearer',

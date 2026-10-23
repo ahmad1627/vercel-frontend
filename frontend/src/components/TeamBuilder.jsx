@@ -16,6 +16,8 @@ const TeamBuilder = ({
   selectedMatch,
   activeMatch,
   onSelectMatch,
+  onSaveTeam,
+  onOpenCaptainModal,
 }) => {
   const [activeRole, setActiveRole] = useState('WK');
   const [teamFilter, setTeamFilter] = useState('ALL');
@@ -471,15 +473,73 @@ const TeamBuilder = ({
         )}
       </div>
 
-      {/* Mobile Drawer Trigger (Sticky at bottom for mobile) */}
-      <div className="lg:hidden mt-4 pt-3 border-t border-emerald-900/80 flex items-center gap-2">
+      {/* Mobile Drawer Trigger */}
+      <div className="lg:hidden mt-4 pt-3 border-t border-emerald-900/80 flex items-center gap-2 pb-16">
         <button
           onClick={onOpenMobilePitch}
-          className="flex-1 py-2.5 rounded-xl bg-linear-to-r from-emerald-800 to-emerald-700 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 shadow"
+          className="flex-1 py-3 rounded-xl bg-linear-to-r from-emerald-800 to-emerald-700 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 shadow"
         >
           <Eye className="w-4 h-4 text-amber-400" />
           Preview Pitch Turf ({selectedPlayers.length}/11)
         </button>
+      </div>
+
+      {/* Floating Sticky Mobile Bottom Action Bar (Fixed above bottom nav) */}
+      <div className="fixed bottom-14 left-0 right-0 z-30 lg:hidden bg-[#031d16]/95 backdrop-blur-md border-t-2 border-amber-400/90 px-3.5 py-2.5 shadow-2xl flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onOpenMobilePitch}
+            className="w-10 h-10 rounded-xl bg-emerald-900/80 border border-emerald-600 flex items-center justify-center text-slate-200 shadow active:scale-95 flex-shrink-0 cursor-pointer"
+            title="Inspect 2D Pitch Lineup"
+          >
+            <Eye className="w-5 h-5 text-amber-400" />
+          </button>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-black text-white">
+                {selectedPlayers.length}
+                <span className="text-slate-400 text-xs font-semibold"> / 11 Picked</span>
+              </span>
+              {selectedPlayers.length === 11 && (
+                <span className="text-[9px] bg-emerald-500 text-emerald-950 font-black px-1.5 py-0.2 rounded-full uppercase">
+                  Ready!
+                </span>
+              )}
+            </div>
+            <div className="text-[10px] text-emerald-300 font-semibold flex items-center gap-1">
+              <span>{teamA}: {teamACount}</span> • <span>{teamB}: {teamBCount}</span>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          {isLocked ? (
+            <span className="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-900 border border-slate-700 text-slate-400">
+              Lineups Frozen
+            </span>
+          ) : selectedPlayers.length === 11 ? (
+            <button
+              onClick={() => {
+                if (onOpenCaptainModal) {
+                  onOpenCaptainModal();
+                } else if (onSaveTeam) {
+                  onSaveTeam();
+                }
+              }}
+              className="px-4 py-2.5 rounded-xl bg-linear-to-r from-amber-400 via-amber-500 to-amber-400 text-emerald-950 font-black text-xs uppercase tracking-wider shadow-lg shadow-amber-400/30 flex items-center gap-1.5 animate-pulse cursor-pointer active:scale-95"
+            >
+              <span>⚡ Save Lineup</span>
+              <ArrowRight className="w-3.5 h-3.5 stroke-[3]" />
+            </button>
+          ) : (
+            <button
+              onClick={() => alert(`Pick ${11 - selectedPlayers.length} more players to complete your 11-player squad.`)}
+              className="px-3 py-2 rounded-xl bg-emerald-950 border border-emerald-700/80 text-amber-300 font-bold text-xs uppercase tracking-wider"
+            >
+              Pick {11 - selectedPlayers.length} More
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

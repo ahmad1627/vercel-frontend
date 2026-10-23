@@ -746,6 +746,8 @@ function App() {
                 selectedMatch={selectedMatch}
                 activeMatch={activeMatch}
                 onSelectMatch={(m) => setSelectedMatch(m)}
+                onSaveTeam={handleSaveTeam}
+                onOpenCaptainModal={() => setIsCaptainModalOpen(true)}
               />
             </div>
 
@@ -777,6 +779,11 @@ function App() {
             matches={matches}
             activeMatchId={selectedMatch?.id || 4}
             onInspectTeam={handleInspectTeam}
+            onBuildTeam={() => {
+              const m4 = matches.find((m) => m.id === 4) || activeMatch;
+              if (m4) setSelectedMatch(m4);
+              setActiveTab('builder');
+            }}
           />
         )}
 

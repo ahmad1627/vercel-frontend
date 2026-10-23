@@ -34,13 +34,14 @@ const Navbar = ({ activeTab, setActiveTab, onOpenAuth, onOpenProfile, onOpenRule
           <nav className="hidden md:flex items-center gap-1.5">
             <button
               onClick={() => setActiveTab('builder')}
-              className={`px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-all ${
+              className={`px-3.5 py-1.5 rounded-lg text-sm font-black transition-all flex items-center gap-1.5 ${
                 activeTab === 'builder'
-                  ? 'bg-emerald-800/80 text-amber-300 shadow-xs border border-emerald-700/60'
-                  : 'text-slate-300 hover:text-white hover:bg-emerald-900/40'
+                  ? 'bg-amber-400 text-emerald-950 shadow-md ring-2 ring-amber-400/50'
+                  : 'text-amber-300 hover:text-white hover:bg-emerald-900/60 border border-emerald-800'
               }`}
             >
-              Squad Builder
+              <Shield className="w-4 h-4 stroke-[2.5]" />
+              <span>Build Team (Game 4)</span>
             </button>
 
             {/* My Team Tab button if logged in */}
@@ -119,7 +120,19 @@ const Navbar = ({ activeTab, setActiveTab, onOpenAuth, onOpenProfile, onOpenRule
           </nav>
 
           {/* User Profile / Auth State */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Quick Mobile "Build 11" CTA Button */}
+            <button
+              onClick={() => setActiveTab('builder')}
+              className={`px-3 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider shadow-lg flex items-center gap-1.5 active:scale-95 md:hidden border transition-all ${
+                activeTab === 'builder'
+                  ? 'bg-amber-400 text-emerald-950 border-amber-300 ring-2 ring-amber-400/40'
+                  : 'bg-linear-to-r from-amber-400 to-amber-500 text-emerald-950 border-amber-300 hover:brightness-110'
+              }`}
+            >
+              <Shield className="w-3.5 h-3.5 fill-current" />
+              <span>Build 11</span>
+            </button>
             {user ? (
               <div className="flex items-center gap-2.5">
                 <div className="hidden sm:flex flex-col items-end cursor-pointer" onClick={onOpenProfile}>
