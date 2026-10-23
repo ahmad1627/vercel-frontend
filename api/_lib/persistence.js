@@ -11,8 +11,11 @@ const path = require('path');
 const db = require('./database');
 const hosted = Boolean(process.env.VERCEL);
 const STATE_KEY = process.env.GAME_NAMESPACE || 'fantasy-cricket:tri-series:2026';
-const redisRestUrl = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || process.env.REDIS_REST_URL || process.env.KV_URL;
-const redisRestToken = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || process.env.REDIS_REST_TOKEN;
+const DEFAULT_CLOUD_REDIS_URL = 'https://more-grubworm-108770.upstash.io';
+const DEFAULT_CLOUD_REDIS_TOKEN = 'gQAAAAAAAajiAQIgcDFhZmI4OWI0ZWI3NTY0ZDIxYWVkZTk1MGE0YThmNDhiZA';
+
+const redisRestUrl = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || process.env.REDIS_REST_URL || process.env.KV_URL || (hosted ? DEFAULT_CLOUD_REDIS_URL : null);
+const redisRestToken = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || process.env.REDIS_REST_TOKEN || (hosted ? DEFAULT_CLOUD_REDIS_TOKEN : null);
 const hasRedis = Boolean(Redis && redisRestUrl && redisRestToken);
 const redis = hasRedis ? new Redis({url: redisRestUrl, token: redisRestToken, automaticDeserialization: false}) : null;
 const localPath = hosted ? path.join('/tmp', 'game.json') : path.resolve(process.env.LOCAL_DATA_FILE || path.join(__dirname, '../data/game.json'));

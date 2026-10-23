@@ -644,14 +644,14 @@ apiRouter.get('/health', (req, res) => {
   const hosted = Boolean(process.env.VERCEL);
   res.json({
     status: 'healthy',
-    version: '2.1.0',
-    commit: '097f2b7-all-matches-persistence',
+    version: '2.3.0',
+    commit: 'v2.3.0-live-cloud-redis',
     node_env: process.env.NODE_ENV || 'production',
     runtime: 'Node.js (Express)',
     series: '2026 Pakistan ODI Tri-Nation Series',
     teams: ['Pakistan (PAK)', 'England (ENG)', 'Sri Lanka (SL)'],
     database: {
-      storage_engine: hasRedis ? 'Upstash Redis Distributed Key-Value' : (hosted ? 'Vercel /tmp (Ephemeral File)' : 'Local Disk JSON'),
+      storage_engine: hasRedis ? 'Upstash Cloud Redis (Permanent Central Database)' : (hosted ? 'Vercel /tmp' : 'Local Disk JSON'),
       is_cloud_persisted: hasRedis,
       users_enrolled: db.users.length,
       teams_enrolled: db.fantasyTeams.length
