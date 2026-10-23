@@ -153,30 +153,10 @@ class Database {
         engStand.played = 2; engStand.won = 0; engStand.lost = 2; engStand.points = 0; engStand.nrr = -0.850;
       }
 
-      // Ensure all registered users have a fantasy team entry for Match 4 on leaderboard
+      // Ensure all registered users (who are not admin-removed) have fantasy teams for all tournament matches
       for (const u of this.users) {
-        if (!u.email || u.email.startsWith('test.manager.')) continue;
-        const hasTeam = this.fantasyTeams.some(t => t.user_id === u.id);
-        if (!hasTeam) {
-          const defaultName = u.full_name || u.email.split('@')[0];
-          const defaultTeamName = u.fantasy_team_name || `${defaultName} XI`;
-          this.fantasyTeams.push({
-            id: this.nextTeamId++,
-            user_id: u.id,
-            match_id: 4,
-            captain_id: null,
-            vice_captain_id: null,
-            player_ids: [],
-            fantasy_team_name: defaultTeamName,
-            full_name: defaultName,
-            user_email: u.email,
-            avatar_url: u.avatar_url || null,
-            total_points: 0.0,
-            rank: null,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          });
-        }
+        if (!u.email || u.email.startsWith('test.manager.') || u.is_removed) continue;
+        this.ensureUserEnrolledInTournament(u.id, u.email, u.full_name, u.fantasy_team_name, u.avatar_url);
       }
     }
 
@@ -344,11 +324,49 @@ class Database {
     return this.fantasyTeams.filter(t => t.user_id === uId);
   }
 
+  ensureUserEnrolledInTournament(userId, userEmail, fullName, fantasyTeamName, avatarUrl) {
+    const uId = parseInt(userId, 10);
+    const user = this.users.find(u => u.id === uId);
+    if (user && user.is_removed) return;
+
+    // Remaining matches in 2026 Tri-Series: Match 4 (Oct 25), 5 (Oct 27), 6 (Oct 29), 7 (The Final Oct 31)
+    const tournamentMatchIds = [4, 5, 6, 7];
+    const defaultName = fullName || user?.full_name || (userEmail ? userEmail.split('@')[0] : 'Cricket Fan');
+    const defaultTeamName = fantasyTeamName || user?.fantasy_team_name || `${defaultName} XI`;
+
+    for (const mId of tournamentMatchIds) {
+      const existing = this.fantasyTeams.find(t => t.user_id === uId && t.match_id === mId);
+      if (!existing) {
+        this.fantasyTeams.push({
+          id: this.nextTeamId++,
+          user_id: uId,
+          match_id: mId,
+          captain_id: null,
+          vice_captain_id: null,
+          player_ids: [],
+          fantasy_team_name: defaultTeamName,
+          full_name: defaultName,
+          user_email: userEmail || user?.email || '',
+          avatar_url: avatarUrl || user?.avatar_url || null,
+          total_points: 0.0,
+          rank: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+      } else {
+        if (!existing.fantasy_team_name && defaultTeamName) existing.fantasy_team_name = defaultTeamName;
+        if (!existing.full_name && defaultName) existing.full_name = defaultName;
+        if (!existing.user_email && userEmail) existing.user_email = userEmail;
+        if (!existing.avatar_url && avatarUrl) existing.avatar_url = avatarUrl;
+      }
+    }
+  }
+
   saveFantasyTeam({ userId, matchId, playerIds, captainId, viceCaptainId, fantasyTeamName, fullName, userEmail, avatarUrl }) {
     const uId = parseInt(userId, 10);
     const mId = parseInt(matchId, 10);
-    const cId = parseInt(captainId, 10);
-    const vcId = parseInt(viceCaptainId, 10);
+    const cId = captainId ? parseInt(captainId, 10) : null;
+    const vcId = viceCaptainId ? parseInt(viceCaptainId, 10) : null;
 
     let team = this.getFantasyTeam(uId, mId);
     if (!team) {
@@ -379,16 +397,32 @@ class Database {
       if (avatarUrl !== undefined) team.avatar_url = avatarUrl;
       team.updated_at = new Date().toISOString();
     }
+
+    const u = this.users.find(user => user.id === uId);
+    if (u) {
+      if (fantasyTeamName) u.fantasy_team_name = fantasyTeamName;
+      if (fullName) u.full_name = fullName;
+      if (avatarUrl) u.avatar_url = avatarUrl;
+      u.is_removed = false;
+    }
+
     return team;
   }
 
   deleteFantasyTeam(teamId) {
     const id = parseInt(teamId, 10);
-    const index = this.fantasyTeams.findIndex(t => t.id === id || t.user_id === id);
-    if (index !== -1) {
-      return this.fantasyTeams.splice(index, 1)[0];
+    const target = this.fantasyTeams.find(t => t.id === id || t.user_id === id);
+    if (!target) return null;
+    const targetUserId = target.user_id;
+
+    const user = this.users.find(u => u.id === targetUserId);
+    if (user) {
+      user.is_removed = true;
     }
-    return null;
+
+    const removed = this.fantasyTeams.filter(t => t.user_id === targetUserId || t.id === id);
+    this.fantasyTeams = this.fantasyTeams.filter(t => t.user_id !== targetUserId && t.id !== id);
+    return removed[0] || target;
   }
 
   // --- Player Match Stats ---
