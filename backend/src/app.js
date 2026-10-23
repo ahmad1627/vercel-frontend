@@ -5,7 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const db = require('./database');
 const { router: authRouter, authMiddleware, adminMiddleware, optionalAuthMiddleware } = require('./auth');
-const { persistence } = require('./persistence');
+const { persistence, hasRedis } = require('./persistence');
 const { calculatePlayerFantasyPoints, calculateTeamPoints } = require('./scoringEngine');
 const { deadline, integer } = require('./validation');
 const rateLimit = require('./rateLimit');
@@ -641,6 +641,7 @@ apiRouter.get('/standings', (req, res) => {
 // ==========================================
 
 apiRouter.get('/health', (req, res) => {
+  const hosted = Boolean(process.env.VERCEL);
   res.json({
     status: 'healthy',
     version: '2.1.0',
@@ -649,6 +650,12 @@ apiRouter.get('/health', (req, res) => {
     runtime: 'Node.js (Express)',
     series: '2026 Pakistan ODI Tri-Nation Series',
     teams: ['Pakistan (PAK)', 'England (ENG)', 'Sri Lanka (SL)'],
+    database: {
+      storage_engine: hasRedis ? 'Upstash Redis Distributed Key-Value' : (hosted ? 'Vercel /tmp (Ephemeral File)' : 'Local Disk JSON'),
+      is_cloud_persisted: hasRedis,
+      users_enrolled: db.users.length,
+      teams_enrolled: db.fantasyTeams.length
+    },
     timestamp: new Date().toISOString()
   });
 });

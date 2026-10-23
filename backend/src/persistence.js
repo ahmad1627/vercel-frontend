@@ -88,4 +88,4 @@ async function persistence(req,res,next) {
   res.status(503).json({detail:'Game database is unavailable. Please check your internet connection or try again shortly.'});
  }
 }
-module.exports={persistence,missingConfiguration,redis,STATE_KEY};
+module.exports={persistence,missingConfiguration,redis,hasRedis,STATE_KEY};
