@@ -110,6 +110,18 @@ class Database {
     this.nextUserId = state.nextUserId;
     this.nextTeamId = state.nextTeamId;
 
+    for (const t of this.fantasyTeams) {
+      if (!t.fantasy_team_name || !t.full_name) {
+        const u = this.users.find(u => u.id === t.user_id);
+        if (u) {
+          if (!t.fantasy_team_name) t.fantasy_team_name = u.fantasy_team_name || `Team #${t.id}`;
+          if (!t.full_name) t.full_name = u.full_name || 'Cricket Fan';
+          if (!t.user_email) t.user_email = u.email || '';
+          if (!t.avatar_url && u.avatar_url) t.avatar_url = u.avatar_url;
+        }
+      }
+    }
+
     if (process.env.NODE_ENV !== 'test') {
       // Ensure Match 3 reflects real-world live result (SL won by 2 wkts, SL: 2 pts, ENG: 0 pts)
       const m3 = this.matches.find(m => m.id === 3);
@@ -342,6 +354,15 @@ class Database {
       team.updated_at = new Date().toISOString();
     }
     return team;
+  }
+
+  deleteFantasyTeam(teamId) {
+    const id = parseInt(teamId, 10);
+    const index = this.fantasyTeams.findIndex(t => t.id === id || t.user_id === id);
+    if (index !== -1) {
+      return this.fantasyTeams.splice(index, 1)[0];
+    }
+    return null;
   }
 
   // --- Player Match Stats ---

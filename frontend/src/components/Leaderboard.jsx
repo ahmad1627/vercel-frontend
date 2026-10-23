@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Trophy, Medal, Shield, Eye, Calendar, Sparkles, ChevronRight, User as UserIcon, Clock, Award, Star, Search, CheckCircle2 } from 'lucide-react';
+import { Trophy, Medal, Shield, Eye, Calendar, Sparkles, ChevronRight, User as UserIcon, Clock, Award, Star, Search, CheckCircle2, Trash2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../api';
 
@@ -21,6 +21,7 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam }) => {
   const [loading, setLoading] = useState(true);
   const [filterMyTeamOnly, setFilterMyTeamOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [deletingTeamId, setDeletingTeamId] = useState(null);
 
   useEffect(() => {
     if (activeMatchId) {
@@ -28,34 +29,40 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam }) => {
     }
   }, [activeMatchId]);
 
-  // Load Match Leaderboard
-  const fetchMatchLeaderboard = async () => {
-    setLoading(true);
+  // Load Match Leaderboard (silent background polling prevents screen flickering)
+  const fetchMatchLeaderboard = async (isBackground = false) => {
+    if (!isBackground && matchLeaderboardData.length === 0) setLoading(true);
     try {
       const res = await api.get(`/leaderboard?match_id=${selectedMatchId}`);
-      setMatchLeaderboardData(res.data.leaderboard || []);
-      setMatchInfo(res.data.match || null);
+      if (Array.isArray(res.data?.leaderboard)) {
+        setMatchLeaderboardData(res.data.leaderboard);
+      }
+      if (res.data?.match) setMatchInfo(res.data.match);
     } catch (err) {
       console.error('Failed to load match leaderboard:', err);
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
-  // Load Overall Cumulative Leaderboard
-  const fetchOverallLeaderboard = async () => {
-    setLoading(true);
+  // Load Overall Cumulative Leaderboard (silent background polling prevents screen flickering)
+  const fetchOverallLeaderboard = async (isBackground = false) => {
+    if (!isBackground && overallData.length === 0) setLoading(true);
     try {
       const res = await api.get('/leaderboard/overall');
-      setOverallData(res.data.leaderboard || []);
-      setOverallMeta({
-        completed_matches: res.data.completed_matches || 0,
-        is_series_concluded: res.data.is_series_concluded || false,
-      });
+      if (Array.isArray(res.data?.leaderboard)) {
+        setOverallData(res.data.leaderboard);
+      }
+      if (res.data) {
+        setOverallMeta({
+          completed_matches: res.data.completed_matches || 0,
+          is_series_concluded: res.data.is_series_concluded || false,
+        });
+      }
     } catch (err) {
       console.error('Failed to load overall leaderboard:', err);
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
@@ -67,16 +74,62 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam }) => {
     }
   }, [viewMode, selectedMatchId]);
 
-  useEffect(()=>{const timer=setInterval(()=>{if(!document.hidden){viewMode==='overall'?fetchOverallLeaderboard():fetchMatchLeaderboard();}},15000);return ()=>clearInterval(timer);},[viewMode,selectedMatchId]);
+  // Periodic 15s refresh without flashing or clearing the screen
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (!document.hidden) {
+        if (viewMode === 'overall') {
+          fetchOverallLeaderboard(true);
+        } else {
+          fetchMatchLeaderboard(true);
+        }
+      }
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [viewMode, selectedMatchId]);
+
+  // Admin action: Permanently remove a team from leaderboard
+  const handleAdminRemoveTeam = async (teamId, teamName, managerName) => {
+    if (!user?.is_admin) return;
+    const confirmMsg = `Are you sure you want to permanently remove "${teamName || 'this team'}" (Manager: ${managerName || 'User'}) from the tournament leaderboard?\n\nThis action cannot be undone.`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setDeletingTeamId(teamId);
+    try {
+      await api.delete(`/admin/teams/${teamId}`);
+      // Remove from match leaderboard state immediately
+      setMatchLeaderboardData(prev => prev.filter(t => t.team_id !== teamId && t.user_id !== teamId));
+      // Remove from overall leaderboard state immediately
+      setOverallData(prev => prev.filter(t => t.team_id !== teamId && t.user_id !== teamId));
+
+      // Record removed ID so local browser fallback never resurrects it
+      try {
+        const removed = JSON.parse(localStorage.getItem('admin_removed_teams') || '[]');
+        removed.push(teamId);
+        localStorage.setItem('admin_removed_teams', JSON.stringify(removed));
+      } catch (e) {}
+
+      alert(`Team "${teamName || teamId}" has been permanently removed by Administrator.`);
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to remove team. Ensure you are signed in as administrator.');
+    } finally {
+      setDeletingTeamId(null);
+    }
+  };
 
   // Active match data filtering with strict 1-person-per-user deduplication
   const displayedMatchTeams = React.useMemo(() => {
     const seenUsers = new Set();
     const seenEmails = new Set();
 
+    let adminRemoved = [];
+    try { adminRemoved = JSON.parse(localStorage.getItem('admin_removed_teams') || '[]'); } catch (e) {}
+
     const list = matchLeaderboardData.filter((t) => {
       const uId = t.user_id ? String(t.user_id) : (t.team_id ? `team_${t.team_id}` : null);
       const email = t.email ? t.email.toLowerCase().trim() : null;
+
+      if (adminRemoved.includes(t.team_id) || adminRemoved.includes(t.user_id)) return false;
 
       // Strict 1 team per user ID or email
       if (uId && seenUsers.has(uId)) return false;
@@ -95,11 +148,12 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam }) => {
     // Check if the current logged in user already has their team listed
     const isUserAlreadyListed = user && (
       seenUsers.has(String(user.id)) ||
-      (user.email && seenEmails.has(user.email.toLowerCase().trim()))
+      (user.email && seenEmails.has(user.email.toLowerCase().trim())) ||
+      adminRemoved.includes(user.id)
     );
 
     // ONLY append fallback if user is definitely NOT in the server leaderboard yet
-    if (user && !isUserAlreadyListed) {
+    if (user && !isUserAlreadyListed && !adminRemoved.includes(user.id)) {
       try {
         const raw = localStorage.getItem('fantasy_squad_m' + selectedMatchId + '_u' + user.id) ||
                     localStorage.getItem('fantasy_squad_m' + selectedMatchId) ||
@@ -131,9 +185,14 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam }) => {
     const seenUsers = new Set();
     const seenEmails = new Set();
 
+    let adminRemoved = [];
+    try { adminRemoved = JSON.parse(localStorage.getItem('admin_removed_teams') || '[]'); } catch (e) {}
+
     const list = overallData.filter((t) => {
       const uId = t.user_id ? String(t.user_id) : (t.team_id ? `team_${t.team_id}` : null);
       const email = t.email ? t.email.toLowerCase().trim() : null;
+
+      if (adminRemoved.includes(t.team_id) || adminRemoved.includes(t.user_id)) return false;
 
       if (uId && seenUsers.has(uId)) return false;
       if (email && seenEmails.has(email)) return false;
@@ -150,10 +209,11 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam }) => {
 
     const isUserAlreadyListed = user && (
       seenUsers.has(String(user.id)) ||
-      (user.email && seenEmails.has(user.email.toLowerCase().trim()))
+      (user.email && seenEmails.has(user.email.toLowerCase().trim())) ||
+      adminRemoved.includes(user.id)
     );
 
-    if (user && !isUserAlreadyListed) {
+    if (user && !isUserAlreadyListed && !adminRemoved.includes(user.id)) {
       try {
         const raw = localStorage.getItem('fantasy_squad_m4_u' + user.id) || 
                     localStorage.getItem('fantasy_squad_m4') ||
@@ -414,14 +474,31 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam }) => {
                           </span>
                         </div>
 
-                        {/* Total Score */}
-                        <div className="text-right flex-shrink-0">
-                          <div className="text-lg sm:text-xl font-black text-amber-400">
-                            {entry.total_points} <span className="text-xs text-slate-400 font-semibold">PTS</span>
+                        {/* Total Score & Admin Remove Button */}
+                        <div className="flex items-center gap-2">
+                          <div className="text-right flex-shrink-0">
+                            <div className="text-lg sm:text-xl font-black text-amber-400">
+                              {entry.total_points} <span className="text-xs text-slate-400 font-semibold">PTS</span>
+                            </div>
+                            <span className="text-[10px] text-emerald-400 block">
+                              Cumulative Total
+                            </span>
                           </div>
-                          <span className="text-[10px] text-emerald-400 block">
-                            Cumulative Total
-                          </span>
+                          {user?.is_admin && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAdminRemoveTeam(entry.team_id || entry.user_id, entry.fantasy_team_name, entry.full_name);
+                              }}
+                              disabled={deletingTeamId === (entry.team_id || entry.user_id)}
+                              title="Admin only: Permanently remove this team from tournament leaderboard"
+                              className="px-2.5 py-1.5 rounded-lg bg-red-950/90 hover:bg-red-800 border border-red-500/70 text-red-200 hover:text-white text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 shadow cursor-pointer ml-1 flex-shrink-0"
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                              <span>{deletingTeamId === (entry.team_id || entry.user_id) ? 'Removing...' : 'Remove'}</span>
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -610,6 +687,21 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam }) => {
                             {isMatchCompleted ? 'Final Match Score' : 'Pre-Match (Ready)'}
                           </span>
                         </div>
+                        {user?.is_admin && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAdminRemoveTeam(team.team_id || team.user_id, team.fantasy_team_name, team.full_name);
+                            }}
+                            disabled={deletingTeamId === (team.team_id || team.user_id)}
+                            title="Admin only: Permanently remove this team from tournament leaderboard"
+                            className="px-2.5 py-1.5 rounded-lg bg-red-950/90 hover:bg-red-800 border border-red-500/70 text-red-200 hover:text-white text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1 shadow cursor-pointer ml-1 flex-shrink-0"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                            <span>{deletingTeamId === (team.team_id || team.user_id) ? 'Removing...' : 'Remove'}</span>
+                          </button>
+                        )}
                         <ChevronRight className="w-4 h-4 text-slate-500" />
                       </div>
                     </div>

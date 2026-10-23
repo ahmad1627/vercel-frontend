@@ -825,6 +825,24 @@ function App() {
         onClose={() => { setInspectedTeamId(null); setInspectedTeamDetails(null); }}
         teamDetails={inspectedTeamDetails}
         loading={isInspecting}
+        isAdmin={Boolean(user?.is_admin)}
+        onRemoveTeam={async (teamId, teamName, managerName) => {
+          if (!window.confirm(`Are you sure you want to permanently delete "${teamName || 'this team'}" (Manager: ${managerName || 'User'}) from the tournament leaderboard?`)) return;
+          try {
+            await api.delete(`/admin/teams/${teamId}`);
+            try {
+              const removed = JSON.parse(localStorage.getItem('admin_removed_teams') || '[]');
+              removed.push(teamId);
+              localStorage.setItem('admin_removed_teams', JSON.stringify(removed));
+            } catch (e) {}
+            alert(`Team "${teamName}" removed successfully by Administrator.`);
+            setInspectedTeamId(null);
+            setInspectedTeamDetails(null);
+            loadMatches();
+          } catch (err) {
+            alert(err.response?.data?.detail || 'Failed to remove team. Ensure you are signed in as administrator.');
+          }
+        }}
       />
 
       {/* Auth Modal (Sign In / Register) */}

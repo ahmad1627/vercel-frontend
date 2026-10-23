@@ -363,4 +363,28 @@ router.post('/reset-tournament', (req, res) => {
   res.json({ message: 'Tournament reset back to Match 4 (Pakistan vs England, 25 Oct).' });
 });
 
+router.delete('/teams/:teamId', (req, res) => {
+  const teamId = parseInt(req.params.teamId, 10);
+  if (isNaN(teamId)) {
+    return res.status(400).json({ detail: 'Invalid team ID' });
+  }
+
+  const removed = db.deleteFantasyTeam(teamId);
+  if (!removed) {
+    return res.status(404).json({ detail: 'Team not found or already deleted' });
+  }
+
+  res.json({
+    success: true,
+    message: `Team "${removed.fantasy_team_name || removed.id}" permanently removed by administrator.`,
+    removed_team: {
+      id: removed.id,
+      user_id: removed.user_id,
+      match_id: removed.match_id,
+      fantasy_team_name: removed.fantasy_team_name,
+      full_name: removed.full_name
+    }
+  });
+});
+
 module.exports = router;

@@ -500,6 +500,30 @@ apiRouter.get('/leaderboard/team/:teamId', optionalAuthMiddleware, (req, res) =>
   });
 });
 
+apiRouter.delete('/leaderboard/team/:teamId', authMiddleware, adminMiddleware, (req, res) => {
+  const teamId = parseInt(req.params.teamId, 10);
+  if (isNaN(teamId)) {
+    return res.status(400).json({ detail: 'Invalid team ID' });
+  }
+
+  const removed = db.deleteFantasyTeam(teamId);
+  if (!removed) {
+    return res.status(404).json({ detail: 'Team not found or already deleted' });
+  }
+
+  res.json({
+    success: true,
+    message: `Team "${removed.fantasy_team_name || removed.id}" permanently removed by administrator.`,
+    removed_team: {
+      id: removed.id,
+      user_id: removed.user_id,
+      match_id: removed.match_id,
+      fantasy_team_name: removed.fantasy_team_name,
+      full_name: removed.full_name
+    }
+  });
+});
+
 apiRouter.get('/leaderboard/overall', (req, res) => {
   const overallList = [];
   const seenEmails = new Set();

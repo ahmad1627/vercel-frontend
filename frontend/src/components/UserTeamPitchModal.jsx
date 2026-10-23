@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Trophy, Shield, Award, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Trophy, Shield, Award, Sparkles, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 
-const UserTeamPitchModal = ({ isOpen, onClose, teamDetails, loading }) => {
+const UserTeamPitchModal = ({ isOpen, onClose, teamDetails, loading, isAdmin, onRemoveTeam }) => {
   const [selectedPlayerForBreakdown, setSelectedPlayerForBreakdown] = useState(null);
 
   useEffect(()=>setSelectedPlayerForBreakdown(null),[teamDetails?.team_id]);
@@ -122,6 +122,17 @@ const UserTeamPitchModal = ({ isOpen, onClose, teamDetails, loading }) => {
           </div>
 
           <div className="flex items-center gap-3">
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => onRemoveTeam && onRemoveTeam(teamDetails.team_id, fantasy_team_name, full_name)}
+                title="Admin only: Permanently remove this team from tournament leaderboard"
+                className="px-2.5 py-1.5 rounded-lg bg-red-950/90 hover:bg-red-800 border border-red-500/70 text-red-200 hover:text-white text-[11px] font-black uppercase tracking-wider transition-all flex items-center gap-1 shadow cursor-pointer mr-1"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                <span>Remove Team</span>
+              </button>
+            )}
             <div className="text-right">
               <span className="text-[10px] uppercase font-bold text-slate-400">Total Score</span>
               <div className="text-xl sm:text-2xl font-black text-amber-400">

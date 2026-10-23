@@ -20,7 +20,7 @@ function ok(condition,label){assert.ok(condition,label);checks++;console.log('PA
 async function start(){const app=require('../api/_lib/app');await new Promise(r=>{server=app.listen(0,'127.0.0.1',r);});base=`http://127.0.0.1:${server.address().port}/api`;}
 async function restart(){await new Promise(r=>server.close(r));for(const p of Object.keys(require.cache))if(p.includes('/backend/src/'))delete require.cache[p];await start();}
 async function call(method,url,body,token){const r=await fetch(base+url,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:`Bearer ${token}`}:{})},body:body==null?undefined:JSON.stringify(body)});return {status:r.status,body:await r.json()};}
-const post=(url,body,token)=>call('POST',url,body,token);const get=(url,token)=>call('GET',url,null,token);
+const post=(url,body,token)=>call('POST',url,body,token);const get=(url,token)=>call('GET',url,null,token);const del=(url,token)=>call('DELETE',url,null,token);
 async function main(){try{
  await start();let r=await get('/health');ok(r.status===200,'API health');
  r=await post('/auth/login',{email:process.env.ADMIN_EMAIL,password:process.env.ADMIN_PASSWORD});assert.equal(r.status,200);const admin=r.body.access_token;
@@ -35,11 +35,15 @@ async function main(){try{
  const payload={match_id:1,player_ids:[1,3,4,19,20,7,22,11,12,27,28],captain_id:1,vice_captain_id:3};
  r=await post('/teams',{...payload,player_ids:[1,3,'3',4,19,7,22,11,12,27,28]},token);ok(r.status===400,'String/numeric duplicate rejected');
  r=await post('/teams',{...payload,player_ids:[1,3,3,4,19,7,22,11,12,27,28]},token);ok(r.status===400,'Numeric duplicate rejected');
- const saved=await Promise.all([post('/teams',payload,token),post('/teams',payload,token2)]);ok(saved.every(r=>r.status===200),'Concurrent team saves committed');const teamId=saved[0].body.team_id;
+ const saved=await Promise.all([post('/teams',payload,token),post('/teams',payload,token2)]);ok(saved.every(r=>r.status===200),'Concurrent team saves committed');let teamId=saved[0].body.team_id;
  r=await post('/admin/players',{players:squad.players},admin);ok(r.status===400,'Squad changes blocked after submissions');
  r=await get('/leaderboard?match_id=1');ok(r.body.leaderboard.length===2&&!JSON.stringify(r.body).includes('@example.test'),'Public leaderboard omits emails');
  r=await get('/leaderboard/team/'+teamId);ok(r.status===403,'Other lineup hidden before deadline');
  r=await get('/leaderboard/team/'+teamId,token);ok(r.status===200,'Owner can inspect own lineup');
+ r=await del('/admin/teams/'+teamId,token);ok(r.status===403,'Non-admin cannot remove team');
+ r=await del('/admin/teams/'+teamId,admin);ok(r.status===200&&r.body.success,'Admin can permanently remove team');
+ r=await get('/leaderboard?match_id=1');ok(r.body.leaderboard.length===1,'Removed team disappears from leaderboard');
+ r=await post('/teams',payload,token);assert.equal(r.status,200);teamId=r.body.team_id;
  const img='data:image/png;base64,'+'A'.repeat(150000);r=await post('/auth/avatar',{avatar_url:img},token);ok(r.status===200,'150KB avatar payload accepted');
  r=await post('/auth/avatar',{avatar_url:'javascript:alert(1)'},token);ok(r.status===400,'Unsafe avatar URL rejected');
  r=await post('/auth/login',{email:123,password:'notvalid'});ok(r.status===400,'Malformed input returns JSON 400');
