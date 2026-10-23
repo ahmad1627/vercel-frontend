@@ -39,6 +39,8 @@ export default function AdminDashboard({ activeMatch, onSimulationComplete, onLo
   const [filterTeam, setFilterTeam] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [adminLoggingIn, setAdminLoggingIn] = useState(false);
+  const [adminEmailInput, setAdminEmailInput] = useState('');
+  const [adminPasswordInput, setAdminPasswordInput] = useState('');
 
   // Load matches list on mount
   useEffect(() => {
@@ -97,17 +99,26 @@ export default function AdminDashboard({ activeMatch, onSimulationComplete, onLo
     }
   }
 
-  // 1-Click Fast Admin Sign In helper
-  async function handleQuickAdminLogin() {
+  // Secure Administrator Manual Sign In
+  async function handleManualAdminLogin(e) {
+    if (e) e.preventDefault();
+    if (!adminEmailInput.trim() || !adminPasswordInput) {
+      setMessage('Please enter both administrator email and password.');
+      return;
+    }
     try {
       setAdminLoggingIn(true);
       setMessage('');
-      await login('ahmad@tahseen.pk', 'Password123!');
-      setMessage('✅ Logged in successfully as Tournament Admin (Ahmad Tahseen)!');
+      const loggedUser = await login(adminEmailInput.trim(), adminPasswordInput);
+      if (!loggedUser?.is_admin) {
+        setMessage('Access denied: This account does not have administrator privileges.');
+        return;
+      }
+      setMessage('✅ Welcome Ahmad Tahseen! Admin Control Center unlocked.');
       await fetchMatches();
       await loadStats('4');
     } catch (err) {
-      setMessage(err.response?.data?.detail || 'Admin login failed. Please sign in manually.');
+      setMessage(err.response?.data?.detail || 'Invalid email or password. Access denied.');
     } finally {
       setAdminLoggingIn(false);
     }
@@ -345,29 +356,51 @@ export default function AdminDashboard({ activeMatch, onSimulationComplete, onLo
           </div>
         )}
 
-        {/* 1-Click Fast Admin Sign In Button */}
-        <div className="bg-[#02241b] border border-emerald-800 rounded-2xl p-5 space-y-3 text-left">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-300">Registered Admin Account:</span>
-            <span className="text-xs font-bold text-amber-400">ahmad@tahseen.pk</span>
+        {/* Secure Admin Credentials Login Form */}
+        <form onSubmit={handleManualAdminLogin} className="bg-[#02241b] border border-emerald-800 rounded-2xl p-5 space-y-3.5 text-left">
+          <div className="flex items-center justify-between border-b border-emerald-900 pb-2">
+            <span className="text-xs font-bold text-slate-300">Authorized Personnel Only</span>
+            <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-500/40">
+              Admin Sign In
+            </span>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-300">Role:</span>
-            <span className="text-xs font-bold text-emerald-300">Tournament Commissioner</span>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-300 mb-1">Admin Email Address</label>
+            <input
+              type="email"
+              required
+              placeholder="Enter administrator email..."
+              value={adminEmailInput}
+              onChange={(e) => setAdminEmailInput(e.target.value)}
+              className="w-full bg-[#031d16] border border-emerald-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-300 mb-1">Admin Password</label>
+            <input
+              type="password"
+              required
+              placeholder="Enter administrator password..."
+              value={adminPasswordInput}
+              onChange={(e) => setAdminPasswordInput(e.target.value)}
+              className="w-full bg-[#031d16] border border-emerald-800 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+            />
           </div>
 
           <button
-            onClick={handleQuickAdminLogin}
+            type="submit"
             disabled={adminLoggingIn}
-            className="w-full py-3.5 rounded-xl bg-linear-to-r from-amber-400 via-amber-500 to-amber-400 hover:from-amber-300 hover:to-amber-500 text-emerald-950 font-black text-xs uppercase tracking-wider transition-all shadow-xl shadow-amber-400/20 active:scale-98 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            className="w-full py-3 rounded-xl bg-linear-to-r from-amber-400 via-amber-500 to-amber-400 hover:from-amber-300 hover:to-amber-500 text-emerald-950 font-black text-xs uppercase tracking-wider transition-all shadow-xl shadow-amber-400/20 active:scale-98 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 mt-2"
           >
-            <Sparkles className="w-4 h-4" />
-            <span>{adminLoggingIn ? 'Logging into Admin Center...' : '⚡ 1-Click Login as Admin (Ahmad Tahseen)'}</span>
+            <Shield className="w-4 h-4 stroke-[2.5]" />
+            <span>{adminLoggingIn ? 'Verifying Admin Credentials...' : 'Unlock Admin Control Center'}</span>
           </button>
-        </div>
+        </form>
 
         <p className="text-[11px] text-slate-400">
-          Or use <button onClick={onOpenAuth} className="text-amber-400 underline font-bold">Sign In / Register</button> in the top right with your password.
+          Players and managers: please use <button onClick={onOpenAuth} className="text-amber-400 underline font-bold">Sign In / Register Team</button> in the top right.
         </p>
       </div>
     );

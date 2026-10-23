@@ -28,8 +28,8 @@ const AuthModal = ({ isOpen, onClose, onOpenForgotPassword }) => {
       setError('Please enter a valid email address.');
       return;
     }
-    if (password.length < (isLoginTab ? 1 : 10)) {
-      setError('New passwords must be at least 10 characters.');
+    if (password.length < (isLoginTab ? 1 : 6)) {
+      setError('Passwords must be at least 6 characters.');
       return;
     }
 
@@ -44,21 +44,6 @@ const AuthModal = ({ isOpen, onClose, onOpenForgotPassword }) => {
     } catch (err) {
       console.error('Auth error:', err);
       setError(err.response?.data?.detail || 'Authentication failed. Please check credentials.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleQuickAdminLogin = async () => {
-    setEmail('ahmad@tahseen.pk');
-    setPassword('Password123!');
-    setLoading(true);
-    setError(null);
-    try {
-      await login('ahmad@tahseen.pk', 'Password123!');
-      onClose();
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Admin login failed.');
     } finally {
       setLoading(false);
     }
@@ -182,28 +167,10 @@ const AuthModal = ({ isOpen, onClose, onOpenForgotPassword }) => {
             </button>
           </form>
 
-          {/* Quick 1-Click Admin Login Shortcut */}
-          {isLoginTab && (
-            <div className="mt-4 pt-3 border-t border-emerald-900/60 text-center">
-              <button
-                type="button"
-                onClick={handleQuickAdminLogin}
-                disabled={loading}
-                className="w-full py-2.5 rounded-xl bg-amber-950/80 hover:bg-amber-900 border border-amber-500/60 text-xs font-black text-amber-300 flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md active:scale-98"
-              >
-                <Shield className="w-4 h-4 text-amber-400 stroke-[2.5]" />
-                <span>⚡ 1-Click Login as Admin (Ahmad Tahseen)</span>
-              </button>
-              <p className="text-[10px] text-slate-400 mt-1.5">
-                Admin access unlocks master lineup locks, score entry & daily winner announcements.
-              </p>
-            </div>
-          )}
-
-          <p className="mt-3 text-center text-[11px] text-slate-400">
+          <p className="mt-4 text-center text-[11px] text-slate-400">
             {isLoginTab
-              ? 'Enter your cousin account email and password to view and submit lineups.'
-              : 'Your fantasy team and points are saved to the tournament database.'}
+              ? 'Enter your registered email and password to access your team and view rankings.'
+              : 'Sign up with your email to build your 11-player squad and join the leaderboard.'}
           </p>
 
         </div>

@@ -792,6 +792,16 @@ function App() {
           <TriSeriesStandings />
         )}
 
+        {/* TAB 4: ADMIN DASHBOARD (ACCESSIBLE ONLY BY AHMAD TAHSEEN) */}
+        {activeTab === 'admin' && (
+          <AdminDashboard
+            activeMatch={activeMatch}
+            onSimulationComplete={loadMatches}
+            onLockToggle={loadMatches}
+            onOpenAuth={() => setIsAuthModalOpen(true)}
+          />
+        )}
+
       </main>
 
       {/* Mobile Slide-Up Drawer for Turf Pitch */}

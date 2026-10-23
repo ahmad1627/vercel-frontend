@@ -131,20 +131,21 @@ router.post('/signup', (req, res) => {
   if (typeof email !== 'string' || email.length > 254 || !EMAIL_REGEX.test(email.trim())) {
     return res.status(400).json({ detail: 'Invalid email format' });
   }
-  if (typeof password !== 'string' || password.length < 10 || Buffer.byteLength(password) > 72) {
-    return res.status(400).json({ detail: 'Password must be 10–72 characters (maximum 72 UTF-8 bytes)' });
+  if (typeof password !== 'string' || password.length < 6 || Buffer.byteLength(password) > 72) {
+    return res.status(400).json({ detail: 'Password must be between 6 and 72 characters' });
   }
 
-  const existingEmail = db.getUserByEmail(email);
+  const cleanEmail = email.toLowerCase().trim();
+  const existingEmail = db.getUserByEmail(cleanEmail);
   if (existingEmail) {
-    return res.status(400).json({ detail: 'Email already registered' });
+    return res.status(400).json({ detail: 'Email already registered. Please sign in instead.' });
   }
 
   if (fantasy_team_name) {
     text(fantasy_team_name, 'Team name', 3, 60);
     const existingTeam = db.getUserByTeamName(fantasy_team_name);
     if (existingTeam) {
-      return res.status(400).json({ detail: 'Fantasy team name is already taken' });
+      return res.status(400).json({ detail: 'Fantasy team name is already taken. Please choose another name.' });
     }
   }
 
@@ -152,7 +153,7 @@ router.post('/signup', (req, res) => {
   const hashedPassword = bcrypt.hashSync(password, salt);
 
   const newUser = db.createUser({
-    email,
+    email: cleanEmail,
     hashed_password: hashedPassword,
     full_name: full_name ? text(full_name, 'Full name', 1, 80) : null,
     fantasy_team_name: fantasy_team_name ? text(fantasy_team_name, 'Team name', 3, 60) : null,
