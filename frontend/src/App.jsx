@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Navbar from './components/Navbar';
 import AdminToolbar from './components/AdminToolbar';
 import AdminDashboard from './components/AdminDashboard';
@@ -186,6 +186,34 @@ function App() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isRulesOpen, setIsRulesOpen] = useState(false);
 
+  const draftRef = useRef({ matchId: null, playerIds: [], captainId: null, viceCaptainId: null });
+  const prevMatchIdRef = useRef(null);
+
+  // Sync draft in memory & localStorage continuously so picks are never lost
+  useEffect(() => {
+    if (!selectedMatch) return;
+    draftRef.current = {
+      matchId: selectedMatch.id,
+      playerIds: selectedPlayers.map((p) => p.id),
+      captainId,
+      viceCaptainId
+    };
+    if (selectedPlayers.length > 0) {
+      try {
+        const draftObj = {
+          match_id: selectedMatch.id,
+          player_ids: selectedPlayers.map((p) => p.id),
+          captain_id: captainId,
+          vice_captain_id: viceCaptainId
+        };
+        localStorage.setItem('fantasy_draft_m' + selectedMatch.id, JSON.stringify(draftObj));
+        if (user) {
+          localStorage.setItem('fantasy_draft_m' + selectedMatch.id + '_u' + user.id, JSON.stringify(draftObj));
+        }
+      } catch (e) {}
+    }
+  }, [selectedMatch?.id, selectedPlayers, captainId, viceCaptainId, user?.id]);
+
   const isCurrentMatchLocked = Boolean(
     selectedMatch?.is_locked ||
     selectedMatch?.status === 'LIVE' ||
@@ -230,7 +258,13 @@ function App() {
   useEffect(() => {
     if (!selectedMatch) return;
     let cancelled = false;
-    setSavedSignature(null); setSelectedPlayers([]); setCaptainId(null); setViceCaptainId(null);
+    const matchChanged = prevMatchIdRef.current !== selectedMatch.id;
+    prevMatchIdRef.current = selectedMatch.id;
+
+    if (matchChanged) {
+      setSavedSignature(null);
+    }
+
     const fetchPlayers = async () => {
       try {
         const res = await api.get(`/matches/${selectedMatch.id}/players`);
@@ -241,7 +275,10 @@ function App() {
         const storageKey = 'fantasy_squad_m' + selectedMatch.id + (user ? '_u' + user.id : '');
         let cachedSquad = null;
         try {
-          const raw = localStorage.getItem(storageKey) || localStorage.getItem('fantasy_squad_m' + selectedMatch.id);
+          const raw = localStorage.getItem(storageKey) || 
+                      localStorage.getItem('fantasy_squad_m' + selectedMatch.id) ||
+                      localStorage.getItem('fantasy_draft_m' + selectedMatch.id) ||
+                      localStorage.getItem('pending_fantasy_squad');
           if (raw) cachedSquad = JSON.parse(raw);
         } catch (e) {}
 
@@ -268,33 +305,60 @@ function App() {
                   captain_id: myTeam.captain_id,
                   vice_captain_id: myTeam.vice_captain_id
                 }));
+                localStorage.removeItem('pending_fantasy_squad');
               } catch (e) {}
-            } else if (cachedSquad && Array.isArray(cachedSquad.player_ids) && cachedSquad.player_ids.length === 11) {
-              // Self-heal: serverless container reset, restore lineup from local persistent backup & re-sync
-              const loadedSquad = cachedSquad.player_ids.map((pId) => res.data.all_players.find((ap) => ap.id === pId)).filter(Boolean);
-              if (loadedSquad.length === 11) {
-                setSelectedPlayers(loadedSquad);
-                setSavedSignature(JSON.stringify([selectedMatch.id, loadedSquad.map((p) => p.id), cachedSquad.captain_id, cachedSquad.vice_captain_id]));
-                setCaptainId(cachedSquad.captain_id);
-                setViceCaptainId(cachedSquad.vice_captain_id);
-                // Background auto-resync to repopulate database/leaderboard on new container
-                if (!isCurrentMatchLocked) {
-                  api.post('/teams', {
-                    match_id: selectedMatch.id,
-                    player_ids: cachedSquad.player_ids,
-                    captain_id: cachedSquad.captain_id,
-                    vice_captain_id: cachedSquad.vice_captain_id
-                  }).catch(() => {});
+            } else {
+              // Server has no team yet for this user.
+              // Check in-memory draft (e.g. drafted just before logging in/signing up)
+              let draftCandidate = null;
+              if (draftRef.current.matchId === selectedMatch.id && draftRef.current.playerIds.length === 11) {
+                draftCandidate = {
+                  player_ids: draftRef.current.playerIds,
+                  captain_id: draftRef.current.captainId,
+                  vice_captain_id: draftRef.current.viceCaptainId
+                };
+              } else if (cachedSquad && Array.isArray(cachedSquad.player_ids) && cachedSquad.player_ids.length === 11) {
+                draftCandidate = cachedSquad;
+              }
+
+              if (draftCandidate && draftCandidate.player_ids.length === 11) {
+                const loadedSquad = draftCandidate.player_ids.map((pId) => res.data.all_players.find((ap) => ap.id === pId)).filter(Boolean);
+                if (loadedSquad.length === 11) {
+                  setSelectedPlayers(loadedSquad);
+                  setSavedSignature(JSON.stringify([selectedMatch.id, loadedSquad.map((p) => p.id), draftCandidate.captain_id, draftCandidate.vice_captain_id]));
+                  setCaptainId(draftCandidate.captain_id);
+                  setViceCaptainId(draftCandidate.vice_captain_id);
+
+                  // Auto-submit to backend so user immediately appears in database and leaderboard!
+                  if (!isCurrentMatchLocked) {
+                    api.post('/teams', {
+                      match_id: selectedMatch.id,
+                      player_ids: draftCandidate.player_ids,
+                      captain_id: draftCandidate.captain_id,
+                      vice_captain_id: draftCandidate.vice_captain_id
+                    }).then(() => {
+                      localStorage.removeItem('pending_fantasy_squad');
+                      setSaveToast({
+                        type: 'success',
+                        text: 'Your 11-player squad has been saved and registered on the leaderboard!'
+                      });
+                      loadMatches();
+                    }).catch(() => {});
+                  }
+                } else if (!matchChanged) {
+                  // Keep whatever is currently selected
+                } else {
+                  setSelectedPlayers([]);
+                  setCaptainId(null);
+                  setViceCaptainId(null);
                 }
+              } else if (!matchChanged && selectedPlayers.length > 0) {
+                // Keep active in-memory draft
               } else {
                 setSelectedPlayers([]);
                 setCaptainId(null);
                 setViceCaptainId(null);
               }
-            } else {
-              setSelectedPlayers([]);
-              setCaptainId(null);
-              setViceCaptainId(null);
             }
           } catch (e) {
             if (cachedSquad && Array.isArray(cachedSquad.player_ids) && cachedSquad.player_ids.length === 11) {
@@ -307,17 +371,31 @@ function App() {
             }
             setLoadError('Could not load your saved team. Your database team has not been removed. Reload before editing.');
           }
-        } else if (cachedSquad && Array.isArray(cachedSquad.player_ids) && cachedSquad.player_ids.length === 11) {
-          const loadedSquad = cachedSquad.player_ids.map((pId) => res.data.all_players.find((ap) => ap.id === pId)).filter(Boolean);
-          if (loadedSquad.length === 11) {
-            setSelectedPlayers(loadedSquad);
-            setCaptainId(cachedSquad.captain_id);
-            setViceCaptainId(cachedSquad.vice_captain_id);
-          }
         } else {
-          setSelectedPlayers([]);
-          setCaptainId(null);
-          setViceCaptainId(null);
+          // Logged out / Guest user: restore previous draft for this match if available
+          let draftCandidate = null;
+          if (draftRef.current.matchId === selectedMatch.id && draftRef.current.playerIds.length > 0) {
+            draftCandidate = {
+              player_ids: draftRef.current.playerIds,
+              captain_id: draftRef.current.captainId,
+              vice_captain_id: draftRef.current.viceCaptainId
+            };
+          } else if (cachedSquad && Array.isArray(cachedSquad.player_ids) && cachedSquad.player_ids.length > 0) {
+            draftCandidate = cachedSquad;
+          }
+
+          if (draftCandidate && draftCandidate.player_ids.length > 0) {
+            const loadedSquad = draftCandidate.player_ids.map((pId) => res.data.all_players.find((ap) => ap.id === pId)).filter(Boolean);
+            if (loadedSquad.length > 0) {
+              setSelectedPlayers(loadedSquad);
+              if (draftCandidate.captain_id) setCaptainId(draftCandidate.captain_id);
+              if (draftCandidate.vice_captain_id) setViceCaptainId(draftCandidate.vice_captain_id);
+            }
+          } else if (matchChanged) {
+            setSelectedPlayers([]);
+            setCaptainId(null);
+            setViceCaptainId(null);
+          }
         }
       } catch (err) {
         console.error('Failed to load players:', err);
@@ -457,10 +535,23 @@ function App() {
       return;
     }
     if (!user) {
+      if (selectedPlayers.length === 11) {
+        const pending = {
+          match_id: selectedMatch.id,
+          player_ids: selectedPlayers.map((p) => p.id),
+          captain_id: captainId,
+          vice_captain_id: viceCaptainId,
+        };
+        try {
+          localStorage.setItem('pending_fantasy_squad', JSON.stringify(pending));
+          localStorage.setItem('fantasy_draft_m' + selectedMatch.id, JSON.stringify(pending));
+        } catch (e) {}
+      }
       setIsAuthOpen(true);
-      return;
-    }
-    if (user.onboarding_required) {
+      setSaveToast({
+        type: 'error',
+        text: 'Please sign in or register your account to submit your 11 players to the leaderboard.',
+      });
       return;
     }
     if (selectedPlayers.length !== 11) {
@@ -490,11 +581,12 @@ function App() {
       try {
         localStorage.setItem(storageKey, JSON.stringify(payload));
         localStorage.setItem('fantasy_squad_m' + selectedMatch.id, JSON.stringify(payload));
+        localStorage.removeItem('pending_fantasy_squad');
       } catch (e) {}
 
       setSaveToast({
         type: 'success',
-        text: 'Your 11-Player Fantasy Squad has been saved successfully to the server!',
+        text: 'Your 11-Player Fantasy Squad has been saved successfully to the server and entered into the leaderboard!',
       });
       setIsCaptainModalOpen(false);
       setIsMobilePitchOpen(false);

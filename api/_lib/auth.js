@@ -110,16 +110,17 @@ function optionalAuthMiddleware(req, res, next) {
 function formatUserResponse(user) {
   const adminEmail = (process.env.ADMIN_EMAIL || 'ahmad@tahseen.pk').toLowerCase().trim();
   const isAdmin = Boolean(user.is_admin || (user.email && user.email.toLowerCase().trim() === adminEmail));
-  const needsOnboarding = !Boolean(user.full_name && user.fantasy_team_name);
+  const fName = user.full_name || (user.email ? user.email.split('@')[0] : 'Cricket Fan');
+  const tName = user.fantasy_team_name || `${fName} XI`;
   return {
     id: user.id,
     email: user.email,
-    full_name: user.full_name,
-    fantasy_team_name: user.fantasy_team_name,
+    full_name: fName,
+    fantasy_team_name: tName,
     avatar_url: user.avatar_url,
     is_admin: isAdmin,
     is_verified: Boolean(user.is_verified || isAdmin),
-    onboarding_required: needsOnboarding
+    onboarding_required: false
   };
 }
 

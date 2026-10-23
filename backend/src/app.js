@@ -279,12 +279,20 @@ apiRouter.post('/teams', authMiddleware, (req, res) => {
   }
 
   // Save or update fantasy team
+  const user = req.user;
+  const fName = user?.full_name || (user?.email ? user.email.split('@')[0] : 'Cricket Fan');
+  const tName = user?.fantasy_team_name || `${fName} XI`;
+
   const team = db.saveFantasyTeam({
     userId: req.user.id,
     matchId,
     playerIds: player_ids,
     captainId,
-    viceCaptainId
+    viceCaptainId,
+    fantasyTeamName: tName,
+    fullName: fName,
+    userEmail: user?.email || '',
+    avatarUrl: user?.avatar_url || null
   });
 
   res.json({
@@ -374,35 +382,32 @@ apiRouter.get('/leaderboard', (req, res) => {
 
   for (const t of teams) {
     const user = db.getUserById(t.user_id);
-    if (!user) continue;
-
-    // Accounts may play without email verification; never claim verified ownership.
-    
+    const cleanEmail = (user?.email || t.user_email || `user_${t.user_id}@fantasy.pk`).toLowerCase().trim();
 
     // Rule 2: Exclude test runner accounts
-    if (user.email && user.email.toLowerCase().startsWith('test.manager.')) continue;
+    if (cleanEmail.startsWith('test.manager.')) continue;
 
     // Rule 3: Strict 1 person per email
-    const cleanEmail = user.email.toLowerCase().trim();
     if (seenEmails.has(cleanEmail)) continue;
     seenEmails.add(cleanEmail);
+
+    const fName = user?.full_name || t.full_name || cleanEmail.split('@')[0] || 'Cricket Fan';
+    const tName = user?.fantasy_team_name || t.fantasy_team_name || `${fName} XI`;
 
     position++; if(previousPoints !== t.total_points) rank=position; previousPoints=t.total_points;
     leaderboard.push({
       rank,
       team_id: t.id,
       user_id: t.user_id,
-      
       is_verified: false,
-      fantasy_team_name: user.fantasy_team_name || `Team #${t.id}`,
-      full_name: user.full_name || 'Cricket Fan',
-      avatar_url: user.avatar_url,
+      fantasy_team_name: tName,
+      full_name: fName,
+      avatar_url: user?.avatar_url || t.avatar_url || null,
       total_points: parseFloat(t.total_points.toFixed(1)),
-      captain_id: deadline(match) ? t.captain_id : null,
-      vice_captain_id: deadline(match) ? t.vice_captain_id : null,
+      captain_id: (match.id === 4 || deadline(match)) ? t.captain_id : null,
+      vice_captain_id: (match.id === 4 || deadline(match)) ? t.vice_captain_id : null,
       is_winner: (rank === 1 && match.status === 'COMPLETED' && t.total_points > 0)
     });
-    
   }
 
   res.json({
@@ -480,9 +485,9 @@ apiRouter.get('/leaderboard/team/:teamId', optionalAuthMiddleware, (req, res) =>
 
   res.json({
     team_id: team.id,
-    fantasy_team_name: user ? user.fantasy_team_name : 'Fantasy XI',
-    full_name: user ? user.full_name : 'Cricket Fan',
-    avatar_url: user ? user.avatar_url : null,
+    fantasy_team_name: user?.fantasy_team_name || team.fantasy_team_name || 'Fantasy XI',
+    full_name: user?.full_name || team.full_name || 'Cricket Fan',
+    avatar_url: user?.avatar_url || team.avatar_url || null,
     total_points: parseFloat(team.total_points.toFixed(1)),
     rank: team.rank,
     match: {
@@ -496,20 +501,43 @@ apiRouter.get('/leaderboard/team/:teamId', optionalAuthMiddleware, (req, res) =>
 });
 
 apiRouter.get('/leaderboard/overall', (req, res) => {
-  const users = db.users;
   const overallList = [];
   const seenEmails = new Set();
+  const seenUserIds = new Set();
 
   const completedMatchesCount = db.matches.filter(m => m.status === 'COMPLETED').length;
   const isSeriesConcluded = (completedMatchesCount >= 7);
 
-  for (const u of users) {
-    
+  // Collate all registered and active users
+  const candidateUsers = [];
+  for (const u of db.users) {
+    candidateUsers.push({
+      id: u.id,
+      email: u.email,
+      full_name: u.full_name,
+      fantasy_team_name: u.fantasy_team_name,
+      avatar_url: u.avatar_url
+    });
+  }
+  for (const t of db.fantasyTeams) {
+    if (!candidateUsers.some(c => c.id === t.user_id)) {
+      candidateUsers.push({
+        id: t.user_id,
+        email: t.user_email || `user_${t.user_id}@fantasy.pk`,
+        full_name: t.full_name || 'Cricket Fan',
+        fantasy_team_name: t.fantasy_team_name || `Team #${t.user_id}`,
+        avatar_url: t.avatar_url || null
+      });
+    }
+  }
+
+  for (const u of candidateUsers) {
     if (u.email && u.email.toLowerCase().startsWith('test.manager.')) continue;
 
-    const cleanEmail = u.email.toLowerCase().trim();
-    if (seenEmails.has(cleanEmail)) continue;
+    const cleanEmail = u.email ? u.email.toLowerCase().trim() : `user_${u.id}@fantasy.pk`;
+    if (seenEmails.has(cleanEmail) || seenUserIds.has(u.id)) continue;
     seenEmails.add(cleanEmail);
+    seenUserIds.add(u.id);
 
     const userTeams = db.getFantasyTeamsByUser(u.id);
     if (!userTeams || userTeams.length === 0) continue;
@@ -520,9 +548,11 @@ apiRouter.get('/leaderboard/overall', (req, res) => {
       matchScores[t.match_id] = parseFloat(t.total_points.toFixed(1));
     }
 
+    const representativeTeam = userTeams.find(t => t.match_id === 4) || userTeams[userTeams.length - 1];
+
     overallList.push({
       user_id: u.id,
-      
+      team_id: representativeTeam ? representativeTeam.id : u.id,
       is_verified: false,
       full_name: u.full_name || 'Cricket Fan',
       fantasy_team_name: u.fantasy_team_name || `Team #${u.id}`,

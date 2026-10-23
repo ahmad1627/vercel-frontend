@@ -69,27 +69,23 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam }) => {
 
   useEffect(()=>{const timer=setInterval(()=>{if(!document.hidden){viewMode==='overall'?fetchOverallLeaderboard():fetchMatchLeaderboard();}},15000);return ()=>clearInterval(timer);},[viewMode,selectedMatchId]);
 
-  // Active match data filtering with strict 1-person-per-email deduplication
+  // Active match data filtering with strict 1-person-per-user deduplication
   const displayedMatchTeams = React.useMemo(() => {
     const seenUsers = new Set();
     const seenEmails = new Set();
-    const seenNames = new Set();
 
     const list = matchLeaderboardData.filter((t) => {
-      const uId = t.user_id ? String(t.user_id) : null;
+      const uId = t.user_id ? String(t.user_id) : (t.team_id ? `team_${t.team_id}` : null);
       const email = t.email ? t.email.toLowerCase().trim() : null;
-      const teamName = t.fantasy_team_name ? t.fantasy_team_name.toLowerCase().trim() : null;
 
-      // Strict 1 team per user ID, email, or team name
+      // Strict 1 team per user ID or email
       if (uId && seenUsers.has(uId)) return false;
       if (email && seenEmails.has(email)) return false;
-      if (teamName && seenNames.has(teamName)) return false;
 
       if (uId) seenUsers.add(uId);
       if (email) seenEmails.add(email);
-      if (teamName) seenNames.add(teamName);
 
-      const matchesFilter = filterMyTeamOnly && user ? t.user_id === user.id : true;
+      const matchesFilter = filterMyTeamOnly && user ? String(t.user_id) === String(user.id) : true;
       const matchesSearch = searchQuery === '' || 
         (t.fantasy_team_name && t.fantasy_team_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (t.full_name && t.full_name.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -99,15 +95,15 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam }) => {
     // Check if the current logged in user already has their team listed
     const isUserAlreadyListed = user && (
       seenUsers.has(String(user.id)) ||
-      (user.email && seenEmails.has(user.email.toLowerCase().trim())) ||
-      (user.fantasy_team_name && seenNames.has(user.fantasy_team_name.toLowerCase().trim()))
+      (user.email && seenEmails.has(user.email.toLowerCase().trim()))
     );
 
     // ONLY append fallback if user is definitely NOT in the server leaderboard yet
     if (user && !isUserAlreadyListed) {
       try {
         const raw = localStorage.getItem('fantasy_squad_m' + selectedMatchId + '_u' + user.id) ||
-                    localStorage.getItem('fantasy_squad_m' + selectedMatchId);
+                    localStorage.getItem('fantasy_squad_m' + selectedMatchId) ||
+                    localStorage.getItem('fantasy_draft_m' + selectedMatchId);
         if (raw) {
           const parsed = JSON.parse(raw);
           if (parsed && Array.isArray(parsed.player_ids) && parsed.player_ids.length === 11) {
@@ -130,26 +126,22 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam }) => {
     return list;
   }, [matchLeaderboardData, filterMyTeamOnly, searchQuery, user, selectedMatchId]);
 
-  // Overall tournament data filtering with strict 1-person-per-email deduplication
+  // Overall tournament data filtering with strict 1-person-per-user deduplication
   const displayedOverallTeams = React.useMemo(() => {
     const seenUsers = new Set();
     const seenEmails = new Set();
-    const seenNames = new Set();
 
     const list = overallData.filter((t) => {
-      const uId = t.user_id ? String(t.user_id) : null;
+      const uId = t.user_id ? String(t.user_id) : (t.team_id ? `team_${t.team_id}` : null);
       const email = t.email ? t.email.toLowerCase().trim() : null;
-      const teamName = t.fantasy_team_name ? t.fantasy_team_name.toLowerCase().trim() : null;
 
       if (uId && seenUsers.has(uId)) return false;
       if (email && seenEmails.has(email)) return false;
-      if (teamName && seenNames.has(teamName)) return false;
 
       if (uId) seenUsers.add(uId);
       if (email) seenEmails.add(email);
-      if (teamName) seenNames.add(teamName);
 
-      const matchesFilter = filterMyTeamOnly && user ? t.user_id === user.id : true;
+      const matchesFilter = filterMyTeamOnly && user ? String(t.user_id) === String(user.id) : true;
       const matchesSearch = searchQuery === '' ||
         (t.fantasy_team_name && t.fantasy_team_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (t.full_name && t.full_name.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -158,13 +150,14 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam }) => {
 
     const isUserAlreadyListed = user && (
       seenUsers.has(String(user.id)) ||
-      (user.email && seenEmails.has(user.email.toLowerCase().trim())) ||
-      (user.fantasy_team_name && seenNames.has(user.fantasy_team_name.toLowerCase().trim()))
+      (user.email && seenEmails.has(user.email.toLowerCase().trim()))
     );
 
     if (user && !isUserAlreadyListed) {
       try {
-        const raw = localStorage.getItem('fantasy_squad_m4_u' + user.id) || localStorage.getItem('fantasy_squad_m4');
+        const raw = localStorage.getItem('fantasy_squad_m4_u' + user.id) || 
+                    localStorage.getItem('fantasy_squad_m4') ||
+                    localStorage.getItem('fantasy_draft_m4');
         if (raw) {
           list.push({
             rank: list.length + 1,

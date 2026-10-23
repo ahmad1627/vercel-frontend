@@ -306,7 +306,7 @@ class Database {
     return this.fantasyTeams.filter(t => t.user_id === uId);
   }
 
-  saveFantasyTeam({ userId, matchId, playerIds, captainId, viceCaptainId }) {
+  saveFantasyTeam({ userId, matchId, playerIds, captainId, viceCaptainId, fantasyTeamName, fullName, userEmail, avatarUrl }) {
     const uId = parseInt(userId, 10);
     const mId = parseInt(matchId, 10);
     const cId = parseInt(captainId, 10);
@@ -321,6 +321,10 @@ class Database {
         captain_id: cId,
         vice_captain_id: vcId,
         player_ids: [...playerIds],
+        fantasy_team_name: fantasyTeamName || `Team #${uId}`,
+        full_name: fullName || 'Cricket Fan',
+        user_email: userEmail || '',
+        avatar_url: avatarUrl || null,
         total_points: 0.0,
         rank: null,
         created_at: new Date().toISOString(),
@@ -331,6 +335,10 @@ class Database {
       team.captain_id = cId;
       team.vice_captain_id = vcId;
       team.player_ids = [...playerIds];
+      if (fantasyTeamName) team.fantasy_team_name = fantasyTeamName;
+      if (fullName) team.full_name = fullName;
+      if (userEmail) team.user_email = userEmail;
+      if (avatarUrl !== undefined) team.avatar_url = avatarUrl;
       team.updated_at = new Date().toISOString();
     }
     return team;
