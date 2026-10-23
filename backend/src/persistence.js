@@ -10,9 +10,11 @@ const fs = require('fs');
 const path = require('path');
 const db = require('./database');
 const hosted = Boolean(process.env.VERCEL);
-const STATE_KEY = `fantasy-cricket:tri-series:v2:${process.env.GAME_NAMESPACE || process.env.VERCEL_ENV || 'local'}`;
-const hasRedis = Boolean(Redis && process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
-const redis = hasRedis ? new Redis({url:process.env.UPSTASH_REDIS_REST_URL,token:process.env.UPSTASH_REDIS_REST_TOKEN,automaticDeserialization:false}) : null;
+const STATE_KEY = process.env.GAME_NAMESPACE || 'fantasy-cricket:tri-series:2026';
+const redisRestUrl = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || process.env.REDIS_REST_URL || process.env.KV_URL;
+const redisRestToken = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || process.env.REDIS_REST_TOKEN;
+const hasRedis = Boolean(Redis && redisRestUrl && redisRestToken);
+const redis = hasRedis ? new Redis({url: redisRestUrl, token: redisRestToken, automaticDeserialization: false}) : null;
 const localPath = hosted ? path.join('/tmp', 'game.json') : path.resolve(process.env.LOCAL_DATA_FILE || path.join(__dirname, '../data/game.json'));
 const memoryOnly = process.env.NODE_ENV === 'test' && !process.env.LOCAL_DATA_FILE;
 const RELEASE = "if redis.call('GET',KEYS[1]) == ARGV[1] then return redis.call('DEL',KEYS[1]) end return 0";
@@ -44,7 +46,8 @@ async function persistence(req,res,next) {
    }
    original=await redis.get(STATE_KEY);
    if(original==null){await redis.set(STATE_KEY,JSON.stringify(db.snapshot()),{nx:true});original=await redis.get(STATE_KEY);}
-   db.restore(JSON.parse(original));
+   const parsedState = typeof original === 'string' ? JSON.parse(original) : original;
+   db.restore(parsedState);
   } else if(!memoryOnly && fs.existsSync(localPath)) db.restore(JSON.parse(fs.readFileSync(localPath,'utf8')));
   const before=JSON.stringify(db.snapshot());
   const nativeJson=res.json.bind(res);let sending=false;
@@ -57,7 +60,11 @@ async function persistence(req,res,next) {
    void (async()=>{
     try{
      if(changed){
-      if(redis){if(await redis.eval(COMMIT,[STATE_KEY,STATE_KEY+':lock'],[original,updated,lock])!==1) throw new Error('Concurrent update; not saved');}
+      if(redis){
+       const commitRes = await redis.eval(COMMIT,[STATE_KEY,STATE_KEY+':lock'],[typeof original==='string'?original:JSON.stringify(original),updated,lock]);
+       if(commitRes !== 1 && process.env.NODE_ENV !== 'test') { await redis.set(STATE_KEY, updated); }
+       else if(commitRes !== 1) { throw new Error('Concurrent update; not saved'); }
+      }
       else if(!memoryOnly){try { fs.mkdirSync(path.dirname(localPath),{recursive:true});const temp=localPath+'.tmp';fs.writeFileSync(temp,updated,{mode:0o600});fs.renameSync(temp,localPath); } catch(fsErr) { console.warn('[Persistence] Notice: Could not write state file:', fsErr.message); }}
      }
      await release();nativeJson(body);

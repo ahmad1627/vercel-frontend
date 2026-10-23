@@ -11,14 +11,24 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam, onBuildTeam }) => 
   
   // Match-specific leaderboard state
   const [selectedMatchId, setSelectedMatchId] = useState(activeMatchId || 4);
-  const [matchLeaderboardData, setMatchLeaderboardData] = useState([]);
+  const [matchLeaderboardData, setMatchLeaderboardData] = useState(() => {
+    try {
+      const c = localStorage.getItem('cached_leaderboard_m' + (activeMatchId || 4));
+      return c ? JSON.parse(c) : [];
+    } catch (e) { return []; }
+  });
   const [matchInfo, setMatchInfo] = useState(null);
   
   // Overall tournament leaderboard state
-  const [overallData, setOverallData] = useState([]);
+  const [overallData, setOverallData] = useState(() => {
+    try {
+      const c = localStorage.getItem('cached_leaderboard_overall');
+      return c ? JSON.parse(c) : [];
+    } catch (e) { return []; }
+  });
   const [overallMeta, setOverallMeta] = useState({ completed_matches: 0, is_series_concluded: false });
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(matchLeaderboardData.length === 0 && overallData.length === 0);
   const [filterMyTeamOnly, setFilterMyTeamOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [deletingTeamId, setDeletingTeamId] = useState(null);
@@ -29,13 +39,50 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam, onBuildTeam }) => 
     }
   }, [activeMatchId]);
 
-  // Load Match Leaderboard (silent background polling prevents screen flickering)
+  useEffect(() => {
+    try {
+      const c = localStorage.getItem('cached_leaderboard_m' + selectedMatchId);
+      if (c) {
+        const parsed = JSON.parse(c);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMatchLeaderboardData(parsed);
+        }
+      }
+    } catch (e) {}
+  }, [selectedMatchId]);
+
+  // Load Match Leaderboard with resilient state merging
   const fetchMatchLeaderboard = async (isBackground = false) => {
     if (!isBackground && matchLeaderboardData.length === 0) setLoading(true);
     try {
       const res = await api.get(`/leaderboard?match_id=${selectedMatchId}`);
       if (Array.isArray(res.data?.leaderboard)) {
-        setMatchLeaderboardData(res.data.leaderboard);
+        setMatchLeaderboardData(prev => {
+          const incoming = res.data.leaderboard;
+          let adminRemoved = [];
+          try { adminRemoved = JSON.parse(localStorage.getItem('admin_removed_teams') || '[]'); } catch (e) {}
+
+          const map = new Map();
+          for (const t of prev) {
+            if (adminRemoved.includes(t.team_id) || adminRemoved.includes(t.user_id)) continue;
+            const key = t.user_id || t.team_id;
+            if (key) map.set(String(key), t);
+          }
+          for (const t of incoming) {
+            if (adminRemoved.includes(t.team_id) || adminRemoved.includes(t.user_id)) continue;
+            const key = t.user_id || t.team_id;
+            if (key) map.set(String(key), { ...(map.get(String(key)) || {}), ...t });
+          }
+          const merged = Array.from(map.values());
+          merged.sort((a, b) => b.total_points - a.total_points);
+          merged.forEach((item, idx) => {
+            item.rank = idx > 0 && merged[idx - 1].total_points === item.total_points ? merged[idx - 1].rank : idx + 1;
+          });
+          try {
+            localStorage.setItem('cached_leaderboard_m' + selectedMatchId, JSON.stringify(merged));
+          } catch (e) {}
+          return merged;
+        });
       }
       if (res.data?.match) setMatchInfo(res.data.match);
     } catch (err) {
@@ -45,13 +92,38 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam, onBuildTeam }) => 
     }
   };
 
-  // Load Overall Cumulative Leaderboard (silent background polling prevents screen flickering)
+  // Load Overall Cumulative Leaderboard with resilient state merging
   const fetchOverallLeaderboard = async (isBackground = false) => {
     if (!isBackground && overallData.length === 0) setLoading(true);
     try {
       const res = await api.get('/leaderboard/overall');
       if (Array.isArray(res.data?.leaderboard)) {
-        setOverallData(res.data.leaderboard);
+        setOverallData(prev => {
+          const incoming = res.data.leaderboard;
+          let adminRemoved = [];
+          try { adminRemoved = JSON.parse(localStorage.getItem('admin_removed_teams') || '[]'); } catch (e) {}
+
+          const map = new Map();
+          for (const t of prev) {
+            if (adminRemoved.includes(t.team_id) || adminRemoved.includes(t.user_id)) continue;
+            const key = t.user_id || t.team_id;
+            if (key) map.set(String(key), t);
+          }
+          for (const t of incoming) {
+            if (adminRemoved.includes(t.team_id) || adminRemoved.includes(t.user_id)) continue;
+            const key = t.user_id || t.team_id;
+            if (key) map.set(String(key), { ...(map.get(String(key)) || {}), ...t });
+          }
+          const merged = Array.from(map.values());
+          merged.sort((a, b) => b.total_points - a.total_points);
+          merged.forEach((item, idx) => {
+            item.rank = idx > 0 && merged[idx - 1].total_points === item.total_points ? merged[idx - 1].rank : idx + 1;
+          });
+          try {
+            localStorage.setItem('cached_leaderboard_overall', JSON.stringify(merged));
+          } catch (e) {}
+          return merged;
+        });
       }
       if (res.data) {
         setOverallMeta({
