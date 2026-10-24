@@ -1,7 +1,7 @@
 /**
  * 2026 Pakistan Men's ODI Tri-Nation Series
  * Participating Teams: Pakistan (PAK), England (ENG), Sri Lanka (SL)
- * Official Schedule & Squad Data:
+ * User-supplied schedule and squad data (verify before real play):
  * - Rawalpindi Leg (Completed Oct 18 - 22, 2026): Team selection strictly closed.
  * - Lahore Leg (Starting Oct 25, 2026 to Final on Oct 31, 2026 at Gaddafi Stadium): Fantasy League active.
  */
@@ -10,7 +10,7 @@ const isTest = process.env.NODE_ENV === 'test';
 
 const PLAYERS_DATA = [
   // ==========================================
-  // PAKISTAN (PAK) - Official 16-Player Squad
+  // PAKISTAN (PAK) - Configured 16-Player Squad
   // ==========================================
   { id: 1, name: "Saad Baig", team: "PAK", role: "WK", is_captain: false },
   { id: 2, name: "Muhammad Ghazi Ghori", team: "PAK", role: "WK", is_captain: false },
@@ -30,7 +30,7 @@ const PLAYERS_DATA = [
   { id: 16, name: "Razaullah Mashwani", team: "PAK", role: "BOWL", is_captain: false },
 
   // ==========================================
-  // ENGLAND (ENG) - Official 16-Player Squad
+  // ENGLAND (ENG) - Configured 16-Player Squad
   // ==========================================
   { id: 17, name: "Jordan Cox", team: "ENG", role: "WK", is_captain: false },
   { id: 18, name: "Tom Banton", team: "ENG", role: "WK", is_captain: false },
@@ -221,7 +221,7 @@ const MATCHES_DATA = [
   }
 ];
 
-// Official Live Standings after Rawalpindi Leg (as of Oct 22, heading into Match 4 on Oct 25)
+// Configured standings after Rawalpindi Leg (as of Oct 22, heading into Match 4 on Oct 25)
 const INITIAL_STANDINGS = isTest ? [
   { team: "PAK", played: 0, won: 0, lost: 0, points: 0, nrr: 0.0 },
   { team: "ENG", played: 0, won: 0, lost: 0, points: 0, nrr: 0.0 },

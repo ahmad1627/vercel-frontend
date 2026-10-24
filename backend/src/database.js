@@ -33,9 +33,9 @@ class Database {
     // Never expose the fixed-password demo accounts on a public deployment.
     const salt = bcrypt.genSaltSync(10);
     const hosted = Boolean(process.env.VERCEL);
-    const adminEmail = (process.env.ADMIN_EMAIL || 'ahmad@tahseen.pk').toLowerCase().trim();
-    const adminPassword = process.env.ADMIN_PASSWORD || 'Password123!';
-    const owner = [{
+    const adminEmail = (process.env.ADMIN_EMAIL || 'admin@fantasy.local').toLowerCase().trim();
+    const adminPassword = process.env.ADMIN_PASSWORD || require('crypto').randomBytes(32).toString('hex');
+    const owner = process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD ? [{
       id: 1,
       email: adminEmail,
       password: adminPassword,
@@ -44,7 +44,7 @@ class Database {
       is_admin: true,
       is_verified: true,
       avatar_url: null
-    }];
+    }] : [];
     this.users = owner.map(u => ({
       ...u,
       password: undefined,
@@ -58,26 +58,6 @@ class Database {
 
     this.initialized = true;
 
-    if (process.env.NODE_ENV !== 'test') {
-      const adminEmail = (process.env.ADMIN_EMAIL || 'ahmad@tahseen.pk').toLowerCase().trim();
-      const admin = this.users.find(u => u.email && u.email.toLowerCase().trim() === adminEmail);
-      if (admin && !this.fantasyTeams.some(t => t.user_id === admin.id && t.match_id === 4)) {
-        this.fantasyTeams.push({
-          id: this.nextTeamId++,
-          user_id: admin.id,
-          match_id: 4,
-          player_ids: [1, 3, 4, 19, 20, 8, 22, 11, 12, 27, 28],
-          captain_id: 3,
-          vice_captain_id: 19,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          total_points: 0.0,
-          rank: 1
-        });
-      }
-    }
-
-    console.log('[Node Database] Initial game state prepared.');
   }
 
   snapshot() {
@@ -122,86 +102,9 @@ class Database {
       }
     }
 
-    if (process.env.NODE_ENV !== 'test') {
-      // Ensure Match 3 reflects real-world live result (SL won by 2 wkts, SL: 2 pts, ENG: 0 pts)
-      const m3 = this.matches.find(m => m.id === 3);
-      if (m3 && m3.winner_team !== 'SL') {
-        m3.winner_team = 'SL';
-        m3.result = 'WIN';
-        m3.scorecard_summary = 'Sri Lanka won by 2 wickets (SL 430/8 in 49.5 ov beat ENG 429/4 in 50 ov)';
-        m3.innings = {
-          a: { runs: 429, wickets: 4, overs: '50', balls: 300 },
-          b: { runs: 430, wickets: 8, overs: '49.5', balls: 299 }
-        };
-      }
-
-      // Ensure Match 7 (The Final) is TBD until finalists qualify
-      const m7 = this.matches.find(m => m.id === 7);
-      if (m7 && (m7.team_a === 'PAK' && m7.team_b === 'ENG') && m7.status === 'TBD_FINAL') {
-        m7.team_a = 'TBD';
-        m7.team_b = 'TBD';
-        m7.title = 'The Final: Top 1 vs Top 2 (Lahore)';
-      }
-
-      // Ensure standings reflect the Sri Lanka win if preliminary matches not finished
-      const pakStand = this.standings.find(s => s.team === 'PAK');
-      const engStand = this.standings.find(s => s.team === 'ENG');
-      const slStand = this.standings.find(s => s.team === 'SL');
-      if (engStand && slStand && engStand.points === 2 && slStand.points === 0 && this.matches.filter(m => m.status === 'COMPLETED').length <= 3) {
-        if (pakStand) { pakStand.played = 2; pakStand.won = 2; pakStand.lost = 0; pakStand.points = 4; pakStand.nrr = 1.240; }
-        slStand.played = 2; slStand.won = 1; slStand.lost = 1; slStand.points = 2; slStand.nrr = -0.200;
-        engStand.played = 2; engStand.won = 0; engStand.lost = 2; engStand.points = 0; engStand.nrr = -0.850;
-      }
-
-      // Ensure all registered users (who are not admin-removed) have fantasy teams for all tournament matches
-      for (const u of this.users) {
-        if (!u.email || u.email.startsWith('test.manager.') || u.is_removed) continue;
-        this.ensureUserEnrolledInTournament(u.id, u.email, u.full_name, u.fantasy_team_name, u.avatar_url);
-      }
-    }
-
-    // Guarantee Ahmad Tahseen (Admin) is always in the user list and is always is_admin: true
-    const adminEmail = (process.env.ADMIN_EMAIL || 'ahmad@tahseen.pk').toLowerCase().trim();
-    const adminPassword = process.env.ADMIN_PASSWORD || 'Password123!';
-    let admin = this.users.find(u => u.email && u.email.toLowerCase().trim() === adminEmail);
-    if (!admin) {
-      const salt = bcrypt.genSaltSync(10);
-      admin = {
-        id: 1,
-        email: adminEmail,
-        hashed_password: bcrypt.hashSync(adminPassword, salt),
-        full_name: 'Ahmad Tahseen',
-        fantasy_team_name: 'Lahore Royals XI',
-        is_admin: true,
-        is_verified: true,
-        avatar_url: null,
-        created_at: new Date().toISOString(),
-        reset_token: null,
-        reset_token_expiry: null,
-        oauth_provider: null,
-        oauth_id: null
-      };
-      this.users.unshift(admin);
-    } else {
-      admin.is_admin = true;
-    }
-
-    if (process.env.NODE_ENV !== 'test' && admin) {
-      if (!this.fantasyTeams.some(t => t.user_id === admin.id && t.match_id === 4)) {
-        this.fantasyTeams.push({
-          id: this.nextTeamId++,
-          user_id: admin.id,
-          match_id: 4,
-          player_ids: [1, 3, 4, 19, 20, 8, 22, 11, 12, 27, 28],
-          captain_id: 3,
-          vice_captain_id: 19,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          total_points: 0.0,
-          rank: 1
-        });
-      }
-    }
+    // Recover counters safely from persisted IDs, without creating users or teams on reads.
+    this.nextUserId = Math.max(100, Number(state.nextUserId) || 0, ...this.users.map(u => Number(u.id) + 1));
+    this.nextTeamId = Math.max(1, Number(state.nextTeamId) || 0, ...this.fantasyTeams.map(t => Number(t.id) + 1));
   }
 
   // --- Users ---
@@ -209,7 +112,7 @@ class Database {
     const numId = parseInt(id, 10);
     const user = this.users.find(u => u.id === numId) || null;
     if (user) {
-      const adminEmail = (process.env.ADMIN_EMAIL || 'ahmad@tahseen.pk').toLowerCase().trim();
+      const adminEmail = (process.env.ADMIN_EMAIL || 'admin@fantasy.local').toLowerCase().trim();
       if (user.email && user.email.toLowerCase().trim() === adminEmail) {
         user.is_admin = true;
       }
@@ -222,7 +125,7 @@ class Database {
     const clean = email.toLowerCase().trim();
     const user = this.users.find(u => u.email && u.email.toLowerCase().trim() === clean) || null;
     if (user) {
-      const adminEmail = (process.env.ADMIN_EMAIL || 'ahmad@tahseen.pk').toLowerCase().trim();
+      const adminEmail = (process.env.ADMIN_EMAIL || 'admin@fantasy.local').toLowerCase().trim();
       if (clean === adminEmail) {
         user.is_admin = true;
       }
@@ -249,7 +152,7 @@ class Database {
       full_name: userData.full_name ? userData.full_name.trim() : null,
       fantasy_team_name: userData.fantasy_team_name ? userData.fantasy_team_name.trim() : null,
       avatar_url: userData.avatar_url || null,
-      is_admin: Boolean(userData.is_admin || userData.email.toLowerCase().trim() === (process.env.ADMIN_EMAIL || 'ahmad@tahseen.pk').toLowerCase().trim()),
+      is_admin: Boolean(userData.is_admin || userData.email.toLowerCase().trim() === (process.env.ADMIN_EMAIL || 'admin@fantasy.local').toLowerCase().trim()),
       is_verified: false,
       oauth_provider: userData.oauth_provider || null,
       oauth_id: userData.oauth_id || null,
@@ -279,10 +182,7 @@ class Database {
   }
 
   getActiveMatch() {
-    const m4 = this.matches.find(m => m.id === 4 && m.is_active && m.status !== 'COMPLETED');
-    const m1Touched = this.matches.find(m => m.id === 1 && (m.score_revision > 0 || (m.is_active && new Date(m.match_date).getTime() > Date.now() + 3600000)));
-    if (m4 && !m1Touched) return m4;
-    return this.matches.find(m => m.is_active && m.status !== 'COMPLETED') || this.matches.find(m => m.is_active) || this.matches[this.matches.length - 1] || null;
+    return this.matches.find(m => m.is_active && m.status !== 'COMPLETED') || this.matches[this.matches.length - 1] || null;
   }
 
   updateMatch(id, updates) {
@@ -308,6 +208,12 @@ class Database {
   }
 
   // --- Fantasy Teams ---
+  isSubmittedTeam(t) {
+    return Array.isArray(t.player_ids) && t.player_ids.length === 11 &&
+      new Set(t.player_ids).size === 11 && t.captain_id !== t.vice_captain_id &&
+      t.player_ids.includes(t.captain_id) && t.player_ids.includes(t.vice_captain_id);
+  }
+
   getFantasyTeam(userId, matchId) {
     const uId = parseInt(userId, 10);
     const mId = parseInt(matchId, 10);
@@ -322,44 +228,6 @@ class Database {
   getFantasyTeamsByUser(userId) {
     const uId = parseInt(userId, 10);
     return this.fantasyTeams.filter(t => t.user_id === uId);
-  }
-
-  ensureUserEnrolledInTournament(userId, userEmail, fullName, fantasyTeamName, avatarUrl) {
-    const uId = parseInt(userId, 10);
-    const user = this.users.find(u => u.id === uId);
-    if (user && user.is_removed) return;
-
-    // Remaining matches in 2026 Tri-Series: Match 4 (Oct 25), 5 (Oct 27), 6 (Oct 29), 7 (The Final Oct 31)
-    const tournamentMatchIds = [4, 5, 6, 7];
-    const defaultName = fullName || user?.full_name || (userEmail ? userEmail.split('@')[0] : 'Cricket Fan');
-    const defaultTeamName = fantasyTeamName || user?.fantasy_team_name || `${defaultName} XI`;
-
-    for (const mId of tournamentMatchIds) {
-      const existing = this.fantasyTeams.find(t => t.user_id === uId && t.match_id === mId);
-      if (!existing) {
-        this.fantasyTeams.push({
-          id: this.nextTeamId++,
-          user_id: uId,
-          match_id: mId,
-          captain_id: null,
-          vice_captain_id: null,
-          player_ids: [],
-          fantasy_team_name: defaultTeamName,
-          full_name: defaultName,
-          user_email: userEmail || user?.email || '',
-          avatar_url: avatarUrl || user?.avatar_url || null,
-          total_points: 0.0,
-          rank: null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        });
-      } else {
-        if (!existing.fantasy_team_name && defaultTeamName) existing.fantasy_team_name = defaultTeamName;
-        if (!existing.full_name && defaultName) existing.full_name = defaultName;
-        if (!existing.user_email && userEmail) existing.user_email = userEmail;
-        if (!existing.avatar_url && avatarUrl) existing.avatar_url = avatarUrl;
-      }
-    }
   }
 
   saveFantasyTeam({ userId, matchId, playerIds, captainId, viceCaptainId, fantasyTeamName, fullName, userEmail, avatarUrl }) {
@@ -406,12 +274,13 @@ class Database {
       u.is_removed = false;
     }
 
+    team.revision = (team.revision || 0) + 1;
     return team;
   }
 
   deleteFantasyTeam(teamId) {
     const id = parseInt(teamId, 10);
-    const target = this.fantasyTeams.find(t => t.id === id || t.user_id === id);
+    const target = this.fantasyTeams.find(t => t.id === id);
     if (!target) return null;
     const targetUserId = target.user_id;
 
@@ -445,7 +314,7 @@ class Database {
 
   // --- Standings ---
   getStandings() {
-    return this.standings.sort((a, b) => b.points - a.points || b.nrr - a.nrr || a.team.localeCompare(b.team));
+    return require('./standings')(this.matches).sort((a, b) => b.points - a.points || b.nrr - a.nrr || a.team.localeCompare(b.team));
   }
 
   updateStandings(teamCode, won, nrrDiff = 0.25) {

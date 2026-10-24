@@ -1,0 +1,167 @@
+
+> pak-triseries-fantasy-2026@1.0.0 test
+> npm run test:backend && npm run test:persistence && npm run test:production && npm run test:multi-instance && npm run test:disk-failure
+
+
+> pak-triseries-fantasy-2026@1.0.0 test:backend
+> node backend/test_node_suite.js
+
+PASS: API health
+PASS: Concurrent registrations all committed
+PASS: Registration does not falsely verify email
+PASS: Non-admin forbidden
+PASS: Past scheduled deadline blocks team submission
+PASS: Squads editable before submissions
+PASS: Admin squad changes accepted
+PASS: String/numeric duplicate rejected
+PASS: Numeric duplicate rejected
+PASS: Concurrent team saves committed
+PASS: Same-account stale device save rejected
+PASS: Saved-team endpoint requires a valid session
+PASS: Squad changes blocked after submissions
+PASS: Public leaderboard omits emails
+PASS: Other lineup hidden before deadline
+PASS: Owner can inspect own lineup
+PASS: Non-admin cannot remove team
+PASS: Admin can permanently remove team
+PASS: Removed team disappears from leaderboard
+PASS: 150KB avatar payload accepted
+PASS: Unsafe avatar URL rejected
+PASS: Malformed input returns JSON 400
+PASS: Account and lineup survive restart
+PASS: Manual lock works
+PASS: Locked team edits blocked
+PASS: Lineups visible after lock
+PASS: Manual statistics saved
+PASS: Manual stats calculate fantasy totals
+PASS: Stale admin scorecard rejected
+PASS: Real match result finalized
+PASS: NRR calculated from innings; all-out uses full quota
+PASS: Equal scores share rank
+PASS: Completed result can be corrected
+PASS: Correction recalculates team points
+PASS: Correction does not double-count standings
+PASS: All seven fixtures complete; tied champions supported
+PASS: Partial-over economy is correct
+PASS: Non-playing player gets zero
+PASS: Invalid cricket overs rejected
+PASS: Admin password recovery
+PASS: Old sessions revoked after password reset
+PASS: Recovered user can sign in
+PASS: Password recovery keeps saved team accessible
+PASS: Updated token version works for optional authentication
+PASS: Unverified social sign-in remains disabled
+PASS: Explicit admin reset
+PASS: Reset removes all old lineups durably
+PASS: Repeated login attempts rate limited
+SUCCESS: 48 regression checks (local disk persistence).
+
+> pak-triseries-fantasy-2026@1.0.0 test:persistence
+> node backend/test_persistence_suite.js
+
+PASS: API health
+PASS: Concurrent registrations all committed
+PASS: Registration does not falsely verify email
+PASS: Non-admin forbidden
+PASS: Past scheduled deadline blocks team submission
+PASS: Squads editable before submissions
+PASS: Admin squad changes accepted
+PASS: String/numeric duplicate rejected
+PASS: Numeric duplicate rejected
+PASS: Concurrent team saves committed
+PASS: Same-account stale device save rejected
+PASS: Saved-team endpoint requires a valid session
+PASS: Squad changes blocked after submissions
+PASS: Public leaderboard omits emails
+PASS: Other lineup hidden before deadline
+PASS: Owner can inspect own lineup
+PASS: Non-admin cannot remove team
+PASS: Admin can permanently remove team
+PASS: Removed team disappears from leaderboard
+PASS: 150KB avatar payload accepted
+PASS: Unsafe avatar URL rejected
+PASS: Malformed input returns JSON 400
+PASS: Account and lineup survive restart
+PASS: Manual lock works
+PASS: Locked team edits blocked
+PASS: Lineups visible after lock
+PASS: Manual statistics saved
+PASS: Manual stats calculate fantasy totals
+PASS: Stale admin scorecard rejected
+PASS: Real match result finalized
+PASS: NRR calculated from innings; all-out uses full quota
+PASS: Equal scores share rank
+PASS: Completed result can be corrected
+PASS: Correction recalculates team points
+PASS: Correction does not double-count standings
+PASS: All seven fixtures complete; tied champions supported
+PASS: Partial-over economy is correct
+PASS: Non-playing player gets zero
+PASS: Invalid cricket overs rejected
+PASS: Admin password recovery
+PASS: Old sessions revoked after password reset
+PASS: Recovered user can sign in
+PASS: Password recovery keeps saved team accessible
+PASS: Updated token version works for optional authentication
+PASS: Unverified social sign-in remains disabled
+PASS: Lost write lease never reports success
+PASS: Redis outage fails closed
+PASS: Explicit admin reset
+PASS: Reset removes all old lineups durably
+PASS: Repeated login attempts rate limited
+SUCCESS: 50 regression checks (Redis mock with contention).
+
+> pak-triseries-fantasy-2026@1.0.0 test:production
+> node backend/test_production_suite.js
+
+PASS: Production signup does not create phantom teams
+PASS: Read requests do not write tournament state
+PASS: Concurrent production reads and saves complete
+PASS: Both confirmed teams appear in production leaderboard
+PASS: Production match 4 lineup private before lock
+PASS: Overall counts actual submitted teams only
+PASS: Production lost lease never falls back to unconditional overwrite
+PASS: Rejected save leaves prior lineup intact
+PASS: Production cold start restores exact saved XI
+PASS: Production outage rejects saves
+PASS: Completed fixtures cannot reopen
+PASS: Production manual lock blocks edits
+PASS: Legacy admin_unlocked never bypasses actual deadline
+PASS: Production refuses ephemeral disk when Redis is not configured
+SUCCESS: 14 production regression checks.
+
+> pak-triseries-fantasy-2026@1.0.0 test:multi-instance
+> node backend/test_multi_instance.js
+
+PASS: Eight simultaneous registrations across independent instances have unique IDs
+PASS: Eight simultaneous team saves visible on both server instances
+PASS: Cross-instance edits preserve revision history
+PASS: Fresh third process restores all eight teams without local caches
+SUCCESS: 4 multi-instance regression checks.
+
+> pak-triseries-fantasy-2026@1.0.0 test:disk-failure
+> node backend/test_disk_failure.js
+
+PASS: Local filesystem write failure cannot report signup success
+PASS: Failed file commit rolls memory back
+PASS: Corrupt state is rejected without reseeding over it
+SUCCESS: 3 filesystem failure checks.
+
+PRODUCTION BUILD
+
+> pak-triseries-fantasy-2026@1.0.0 build
+> npm --prefix frontend run build && node -e "require('fs').cpSync('frontend/dist','dist',{recursive:true})"
+
+
+> fantasy-cricket-frontend@1.0.0 build
+> vite build
+
+vite v6.4.4 building for production...
+transforming...
+✓ 1653 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   1.09 kB │ gzip:   0.63 kB
+dist/assets/index-ClQGXYdE.css   80.26 kB │ gzip:  11.93 kB
+dist/assets/index-BmMN9KnI.js   399.03 kB │ gzip: 106.79 kB
+✓ built in 2.20s

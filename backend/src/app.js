@@ -18,7 +18,7 @@ const app = express();
 // The deployed React frontend and API use the same Vercel domain. Cross-origin
 // access is needed only when developing locally with Vite on port 5173.
 app.use(cors({
-  origin: true,
+  origin: (origin, cb) => { const allowed = (process.env.FRONTEND_URL || 'http://localhost:5173,http://127.0.0.1:5173').split(',').map(s=>s.trim()); cb(null, !origin || allowed.includes(origin)); },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -37,7 +37,7 @@ function formatMatchLockInfo(m) {
   const dateObj = new Date(m.match_date);
   const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-  if (m.team_selection_disabled || (m.match_number < 4 && new Date(m.match_date) < new Date('2026-10-25T00:00:00+05:00'))) {
+  if (m.team_selection_disabled) {
     statusBadge = 'COMPLETED_RAWALPINDI';
     lockStatusText = 'Rawalpindi Leg (Completed) — Team Selection Closed. Fantasy starts Match 4 (Oct 25).';
   } else if (m.status === 'COMPLETED') {
@@ -83,7 +83,7 @@ apiRouter.get('/matches', (req, res) => {
       status: m.status,
       is_active: m.is_active,
       is_locked: deadline(m),
-      team_selection_disabled: Boolean(m.team_selection_disabled || (m.match_number < 4 && new Date(m.match_date) < new Date('2026-10-25T00:00:00+05:00'))),
+      team_selection_disabled: Boolean(m.team_selection_disabled),
       is_selectable: isSelectable,
       status_badge: statusBadge,
       lock_status_text: lockStatusText,
@@ -112,7 +112,7 @@ apiRouter.get('/matches/active', (req, res) => {
     status: active.status,
     is_active: active.is_active,
     is_locked: deadline(active),
-    team_selection_disabled: Boolean(active.team_selection_disabled || (active.match_number < 4 && new Date(active.match_date) < new Date('2026-10-25T00:00:00+05:00'))),
+    team_selection_disabled: Boolean(active.team_selection_disabled),
     is_selectable: isSelectable,
     status_badge: statusBadge,
     lock_status_text: lockStatusText,
@@ -179,7 +179,7 @@ apiRouter.get('/matches/:match_id/players', (req, res) => {
 // ==========================================
 
 apiRouter.post('/teams', authMiddleware, (req, res) => {
-  const { match_id, player_ids, captain_id, vice_captain_id } = req.body || {};
+  const { match_id, player_ids, captain_id, vice_captain_id, revision } = req.body || {};
   const matchId = parseInt(match_id, 10);
   const captainId = parseInt(captain_id, 10);
   const viceCaptainId = parseInt(vice_captain_id, 10);
@@ -189,7 +189,7 @@ apiRouter.post('/teams', authMiddleware, (req, res) => {
     return res.status(404).json({ detail: 'Match not found' });
   }
 
-  if ((match.team_selection_disabled || match.match_number < 4) && process.env.NODE_ENV !== 'test') {
+  if (match.team_selection_disabled) {
     return res.status(400).json({
       detail: 'Team selection is strictly disabled for matches before October 25. Fantasy League officially starts from Match 4 on Oct 25 (Pakistan vs England).'
     });
@@ -278,6 +278,10 @@ apiRouter.post('/teams', authMiddleware, (req, res) => {
     return res.status(400).json({ detail: `Bowlers (BOWL) must be between 3 and 6 (you have ${roleCounts.BOWL}).` });
   }
 
+  const existing = db.getFantasyTeam(req.user.id, matchId);
+  if (revision !== undefined && revision !== (existing?.revision || 0)) {
+    return res.status(409).json({ detail: 'This team changed on another device. Reload the saved team before editing.' });
+  }
   // Save or update fantasy team
   const user = req.user;
   const fName = user?.full_name || (user?.email ? user.email.split('@')[0] : 'Cricket Fan');
@@ -295,9 +299,6 @@ apiRouter.post('/teams', authMiddleware, (req, res) => {
     avatarUrl: user?.avatar_url || null
   });
 
-  if (process.env.NODE_ENV !== 'test') {
-    db.ensureUserEnrolledInTournament(req.user.id, user?.email, fName, tName, user?.avatar_url);
-  }
 
   res.json({
     message: 'Fantasy team saved successfully!',
@@ -305,18 +306,21 @@ apiRouter.post('/teams', authMiddleware, (req, res) => {
     match_id: team.match_id,
     captain_id: team.captain_id,
     vice_captain_id: team.vice_captain_id,
+    revision: team.revision,
+    updated_at: team.updated_at,
+    player_ids: team.player_ids,
     player_count: team.player_ids.length
   });
 });
 
-apiRouter.get('/teams/my-team', optionalAuthMiddleware, (req, res) => {
+apiRouter.get('/teams/my-team', authMiddleware, (req, res) => {
   if (!req.user) {
     return res.json({ has_team: false, team: null });
   }
 
   const matchId = parseInt(req.query.match_id, 10);
   const team = db.getFantasyTeam(req.user.id, matchId);
-  if (!team) {
+  if (!team || !db.isSubmittedTeam(team)) {
     return res.json({ has_team: false, team: null });
   }
 
@@ -352,6 +356,8 @@ apiRouter.get('/teams/my-team', optionalAuthMiddleware, (req, res) => {
     has_team: true,
     team: {
       id: team.id,
+      revision: team.revision || 0,
+      updated_at: team.updated_at,
       match_id: team.match_id,
       captain_id: team.captain_id,
       vice_captain_id: team.vice_captain_id,
@@ -377,14 +383,7 @@ apiRouter.get('/leaderboard', (req, res) => {
     return res.status(404).json({ detail: 'Match not found' });
   }
 
-  if (match.id >= 4 && process.env.NODE_ENV !== 'test') {
-    for (const u of db.users) {
-      if (!u.email || u.email.startsWith('test.manager.') || u.is_removed) continue;
-      db.ensureUserEnrolledInTournament(u.id, u.email, u.full_name, u.fantasy_team_name, u.avatar_url);
-    }
-  }
-
-  const teams = db.getFantasyTeamsByMatch(matchId);
+  const teams = db.getFantasyTeamsByMatch(matchId).filter(t => db.isSubmittedTeam(t) && !db.getUserById(t.user_id)?.is_removed);
   teams.sort((a, b) => b.total_points - a.total_points || a.id - b.id);
 
   const leaderboard = [];
@@ -415,8 +414,8 @@ apiRouter.get('/leaderboard', (req, res) => {
       full_name: fName,
       avatar_url: user?.avatar_url || t.avatar_url || null,
       total_points: parseFloat(t.total_points.toFixed(1)),
-      captain_id: (match.id === 4 || deadline(match)) ? t.captain_id : null,
-      vice_captain_id: (match.id === 4 || deadline(match)) ? t.vice_captain_id : null,
+      captain_id: deadline(match) ? t.captain_id : null,
+      vice_captain_id: deadline(match) ? t.vice_captain_id : null,
       is_winner: (rank === 1 && match.status === 'COMPLETED' && t.total_points > 0)
     });
   }
@@ -437,17 +436,12 @@ apiRouter.get('/leaderboard', (req, res) => {
 apiRouter.get('/leaderboard/team/:teamId', optionalAuthMiddleware, (req, res) => {
   const teamId = parseInt(req.params.teamId, 10);
   let team = db.fantasyTeams.find(t => t.id === teamId);
-  if (!team && !isNaN(teamId)) {
-    // If not matched by team ID, find user's latest fantasy team
-    team = db.fantasyTeams.find(t => t.user_id === teamId && t.match_id === 4) ||
-           db.fantasyTeams.find(t => t.user_id === teamId);
-  }
   if (!team) {
     return res.status(404).json({ detail: 'Fantasy team not found' });
   }
 
   const match = db.getMatchById(team.match_id);
-  if (process.env.NODE_ENV === 'test' && match.id === 1 && !deadline(match) && req.user?.id !== team.user_id && !req.user?.is_admin) {
+  if (!deadline(match) && req.user?.id !== team.user_id && !req.user?.is_admin) {
     return res.status(403).json({ detail: 'Other managers’ lineups are private until the deadline.' });
   }
   const user = db.getUserById(team.user_id);
@@ -579,8 +573,8 @@ apiRouter.get('/leaderboard/overall', (req, res) => {
     seenEmails.add(cleanEmail);
     seenUserIds.add(u.id);
 
-    const userTeams = db.getFantasyTeamsByUser(u.id);
-    if ((!userTeams || userTeams.length === 0) && process.env.NODE_ENV === 'test') continue;
+    const userTeams = db.getFantasyTeamsByUser(u.id).filter(t => db.isSubmittedTeam(t));
+    if (userTeams.length === 0) continue;
 
     const totalPts = userTeams.reduce((sum, t) => sum + (t.total_points || 0), 0);
     const matchScores = {};
@@ -588,7 +582,7 @@ apiRouter.get('/leaderboard/overall', (req, res) => {
       matchScores[t.match_id] = parseFloat((t.total_points || 0).toFixed(1));
     }
 
-    const representativeTeam = userTeams.find(t => t.match_id === 4) || userTeams[0];
+    const representativeTeam = [...userTeams].sort((a,b) => b.match_id-a.match_id)[0];
 
     overallList.push({
       user_id: u.id,
@@ -597,7 +591,7 @@ apiRouter.get('/leaderboard/overall', (req, res) => {
       full_name: u.full_name || 'Cricket Fan',
       fantasy_team_name: u.fantasy_team_name || `${u.full_name || 'Cricket'} XI`,
       avatar_url: u.avatar_url,
-      matches_played: userTeams.length || 1,
+      matches_played: userTeams.length,
       total_points: parseFloat(totalPts.toFixed(1)),
       match_scores: matchScores
     });
@@ -644,14 +638,14 @@ apiRouter.get('/health', (req, res) => {
   const hosted = Boolean(process.env.VERCEL);
   res.json({
     status: 'healthy',
-    version: '2.3.0',
-    commit: 'v2.3.0-live-cloud-redis',
+    version: '3.0.0',
+    commit: 'durable-team-saves',
     node_env: process.env.NODE_ENV || 'production',
     runtime: 'Node.js (Express)',
     series: '2026 Pakistan ODI Tri-Nation Series',
     teams: ['Pakistan (PAK)', 'England (ENG)', 'Sri Lanka (SL)'],
     database: {
-      storage_engine: hasRedis ? 'Upstash Cloud Redis (Permanent Central Database)' : (hosted ? 'Vercel /tmp' : 'Local Disk JSON'),
+      storage_engine: hasRedis ? 'Upstash Cloud Redis (Permanent Central Database)' : 'Local Disk JSON (development only)',
       is_cloud_persisted: hasRedis,
       users_enrolled: db.users.length,
       teams_enrolled: db.fantasyTeams.length
@@ -660,12 +654,11 @@ apiRouter.get('/health', (req, res) => {
   });
 });
 
-// Mount the API Router on both '/' and '/api'
-app.use('/api', rateLimit, persistence, apiRouter);
-app.use('/', rateLimit, persistence, apiRouter);
-
-app.use((req, res) => {
-  res.status(404).json({ detail: `API route '${req.method} ${req.url}' not found.` });
+// Run persistence once, only for API requests. Static assets never touch storage.
+app.use('/api', rateLimit, persistence, apiRouter, (req,res) => res.status(404).json({detail:'API route not found.'}));
+app.use((req,res,next) => {
+  if (!/^\/(auth|admin|matches|teams|leaderboard|standings|health)(?:\/|$)/.test(req.path)) return next();
+  rateLimit(req,res,() => persistence(req,res,() => apiRouter(req,res,next)));
 });
 
 // ==========================================
@@ -705,6 +698,8 @@ if (staticDistDir) {
     res.sendFile(path.join(staticDistDir, 'index.html'));
   });
 }
+
+app.use((req,res) => res.status(404).json({detail:'Route not found.'}));
 
 app.use((err,req,res,next)=>{
   if(res.headersSent)return next(err);

@@ -11,6 +11,7 @@ export const AuthProvider = ({ children }) => {
 
   // Check current user on boot
   useEffect(() => {
+    let cancelled = false;
     const fetchMe = async () => {
       if (!token) {
         setLoading(false);
@@ -18,18 +19,20 @@ export const AuthProvider = ({ children }) => {
       }
       try {
         const res = await api.get('/auth/me');
+        if (cancelled) return;
         setUser(res.data); setSessionError('');
       } catch (err) {
-        console.error('Failed to restore session:', err);
-        if (![401,403,404].includes(err.response?.status)) setSessionError(err.response?.data?.detail || (err.code === 'ERR_NETWORK' || !err.response ? 'Backend server is not reachable. Start it with "npm run dev".' : 'Could not restore your session. Reload when your connection is available.'));
+        if (cancelled) return;
+        if (![401,403,404].includes(err.response?.status)) setSessionError(err.response?.data?.detail || (err.code === 'ERR_NETWORK' || !err.response ? 'The game server could not be reached. Check your connection and retry.' : 'Could not restore your session. Reload when your connection is available.'));
         if ([401,403,404].includes(err.response?.status)) {
           localStorage.removeItem('fantasy_auth_token'); setToken(null); setUser(null);
         }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     fetchMe();
+    return () => { cancelled = true; };
   }, [token]);
 
   const login = async (email, password) => {
@@ -37,7 +40,7 @@ export const AuthProvider = ({ children }) => {
     const { access_token, user: userData } = res.data;
     localStorage.setItem('fantasy_auth_token', access_token);
     setToken(access_token);
-    setUser(userData);
+    setUser(userData); setSessionError('');
     return userData;
   };
 
@@ -51,7 +54,7 @@ export const AuthProvider = ({ children }) => {
     const { access_token, user: userData } = res.data;
     localStorage.setItem('fantasy_auth_token', access_token);
     setToken(access_token);
-    setUser(userData);
+    setUser(userData); setSessionError('');
     return userData;
   };
 
@@ -65,7 +68,7 @@ export const AuthProvider = ({ children }) => {
     const { access_token, user: userData } = res.data;
     localStorage.setItem('fantasy_auth_token', access_token);
     setToken(access_token);
-    setUser(userData);
+    setUser(userData); setSessionError('');
     return userData;
   };
 
@@ -86,6 +89,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = () => {
+    localStorage.removeItem('fantasy_pending_guest');
+    setSessionError('');
     localStorage.removeItem('fantasy_auth_token');
     setToken(null);
     setUser(null);

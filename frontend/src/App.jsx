@@ -152,7 +152,7 @@ const MatchCountdownBanner = ({ match }) => {
 };
 
 function App() {
-  const { user, sessionError } = useAuth();
+  const { user, sessionError, loading: authLoading } = useAuth();
 
   // Navigation & View States
   const [activeTab, setActiveTab] = useState('builder'); // 'builder' | 'leaderboard' | 'standings'
@@ -186,39 +186,27 @@ function App() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isRulesOpen, setIsRulesOpen] = useState(false);
 
-  const draftRef = useRef({ matchId: null, playerIds: [], captainId: null, viceCaptainId: null });
-  const prevMatchIdRef = useRef(null);
-
-  // Sync draft in memory & localStorage continuously so picks are never lost
+  const [loadedScope, setLoadedScope] = useState(null);
+  const [teamLoadError, setTeamLoadError] = useState('');
+  const [reloadTeam, setReloadTeam] = useState(0);
+  const [teamRevision, setTeamRevision] = useState(0);
+  const scope = `${user?.id || 'guest'}:${selectedMatch?.id || 0}`;
+  const scopeRef = useRef(scope);
+  scopeRef.current = scope;
+  const saveInFlight = useRef(false);
+  const draftKey = `fantasy_v3_draft:${scope}`;
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  const isCurrentMatchLocked = Boolean(!selectedMatch || !selectedMatch.is_selectable ||
+    selectedMatch.is_locked || now >= Date.parse(selectedMatch.match_date) ||
+    loadedScope !== scope || isSubmitting || teamLoadError || authLoading);
   useEffect(() => {
-    if (!selectedMatch) return;
-    draftRef.current = {
-      matchId: selectedMatch.id,
-      playerIds: selectedPlayers.map((p) => p.id),
-      captainId,
-      viceCaptainId
-    };
-    if (selectedPlayers.length > 0) {
-      try {
-        const draftObj = {
-          match_id: selectedMatch.id,
-          player_ids: selectedPlayers.map((p) => p.id),
-          captain_id: captainId,
-          vice_captain_id: viceCaptainId
-        };
-        localStorage.setItem('fantasy_draft_m' + selectedMatch.id, JSON.stringify(draftObj));
-        if (user) {
-          localStorage.setItem('fantasy_draft_m' + selectedMatch.id + '_u' + user.id, JSON.stringify(draftObj));
-        }
-      } catch (e) {}
-    }
-  }, [selectedMatch?.id, selectedPlayers, captainId, viceCaptainId, user?.id]);
-
-  const isCurrentMatchLocked = Boolean(
-    selectedMatch?.is_locked ||
-    selectedMatch?.status === 'LIVE' ||
-    selectedMatch?.status === 'COMPLETED'
-  );
+    if (loadedScope !== scope || authLoading || teamLoadError) return;
+    try {
+      localStorage.setItem(draftKey, JSON.stringify({match_id:selectedMatch.id,
+        player_ids:selectedPlayers.map(p=>p.id),captain_id:captainId,vice_captain_id:viceCaptainId}));
+    } catch {}
+  }, [scope, loadedScope, selectedPlayers, captainId, viceCaptainId, authLoading, teamLoadError]);
 
   // Inspect User Team Pitch Modal (from Leaderboard)
   const [inspectedTeamId, setInspectedTeamId] = useState(null);
@@ -234,14 +222,13 @@ function App() {
 
       const actRes = await api.get('/matches/active');
       setActiveMatch(actRes.data);
-      if (!selectedMatch) {
-        setSelectedMatch(actRes.data);
-      } else {
-        const updated = res.data.find((m) => m.id === selectedMatch.id);
-        if (updated) setSelectedMatch(prev=>JSON.stringify(prev)===JSON.stringify(updated)?prev:updated);
-      }
+      setSelectedMatch(prev => {
+        if (!prev) return actRes.data;
+        const updated = res.data.find(m => m.id === prev.id);
+        return !updated || JSON.stringify(prev) === JSON.stringify(updated) ? prev : updated;
+      });
     } catch (err) {
-      const msg = err.response?.data?.detail || (err.code === 'ERR_NETWORK' || !err.response ? 'Backend server is not reachable on port 5000. Start it in VS Code with "npm run dev".' : 'Could not load the game. Check your connection and retry.'); setLoadError(msg);
+      const msg = err.response?.data?.detail || (err.code === 'ERR_NETWORK' || !err.response ? 'The game server could not be reached. Check your connection and retry.' : 'Could not load the game. Check your connection and retry.'); setLoadError(msg);
     }
   };
 
@@ -254,156 +241,50 @@ function App() {
     return ()=>clearInterval(timer);
   }, [selectedMatch?.id]);
 
-  // Load Players for currently selected match
+  // Server is the authority for submitted teams; browser drafts are account scoped.
   useEffect(() => {
-    if (!selectedMatch) return;
+    if (!selectedMatch || authLoading) return;
     let cancelled = false;
-    const matchChanged = prevMatchIdRef.current !== selectedMatch.id;
-    prevMatchIdRef.current = selectedMatch.id;
-
-    if (matchChanged) {
-      setSavedSignature(null);
-    }
-
-    const fetchPlayers = async () => {
+    setLoadedScope(null); setTeamLoadError(''); setSavedSignature(null);
+    setSelectedPlayers([]); setCaptainId(null); setViceCaptainId(null);
+    setCategorizedPlayers({WK:[],BAT:[],AR:[],BOWL:[]}); setAllPlayers([]);
+    setTeamRevision(0); setIsCaptainModalOpen(false); setSaveToast(null);
+    (async () => {
       try {
-        const res = await api.get(`/matches/${selectedMatch.id}/players`);
+        const [roster, saved] = await Promise.all([
+          api.get(`/matches/${selectedMatch.id}/players`),
+          user ? api.get(`/teams/my-team?match_id=${selectedMatch.id}`) : Promise.resolve(null)
+        ]);
         if (cancelled) return;
-        setCategorizedPlayers(res.data.categorized_players);
-        setAllPlayers(res.data.all_players);
-
-        const storageKey = 'fantasy_squad_m' + selectedMatch.id + (user ? '_u' + user.id : '');
-        let cachedSquad = null;
-        try {
-          const raw = localStorage.getItem(storageKey) || 
-                      localStorage.getItem('fantasy_squad_m' + selectedMatch.id) ||
-                      localStorage.getItem('fantasy_draft_m' + selectedMatch.id) ||
-                      localStorage.getItem('pending_fantasy_squad');
-          if (raw) cachedSquad = JSON.parse(raw);
-        } catch (e) {}
-
-        // Load existing saved fantasy team if user is logged in
-        if (user) {
-          try {
-            const teamRes = await api.get(`/teams/my-team?match_id=${selectedMatch.id}`);
-            if (cancelled) return;
-            if (teamRes.data.has_team && teamRes.data.team) {
-              const myTeam = teamRes.data.team;
-              // Map team players from all_players
-              const loadedSquad = myTeam.players.map((p) => {
-                const found = res.data.all_players.find((ap) => ap.id === p.id);
-                return found || p;
-              });
-              setSelectedPlayers(loadedSquad);
-              setSavedSignature(JSON.stringify([selectedMatch.id, loadedSquad.map((p) => p.id), myTeam.captain_id, myTeam.vice_captain_id]));
-              setCaptainId(myTeam.captain_id);
-              setViceCaptainId(myTeam.vice_captain_id);
-              try {
-                localStorage.setItem(storageKey, JSON.stringify({
-                  match_id: selectedMatch.id,
-                  player_ids: loadedSquad.map((p) => p.id),
-                  captain_id: myTeam.captain_id,
-                  vice_captain_id: myTeam.vice_captain_id
-                }));
-                localStorage.removeItem('pending_fantasy_squad');
-              } catch (e) {}
-            } else {
-              // Server has no team yet for this user.
-              // Check in-memory draft (e.g. drafted just before logging in/signing up)
-              let draftCandidate = null;
-              if (draftRef.current.matchId === selectedMatch.id && draftRef.current.playerIds.length === 11) {
-                draftCandidate = {
-                  player_ids: draftRef.current.playerIds,
-                  captain_id: draftRef.current.captainId,
-                  vice_captain_id: draftRef.current.viceCaptainId
-                };
-              } else if (cachedSquad && Array.isArray(cachedSquad.player_ids) && cachedSquad.player_ids.length === 11) {
-                draftCandidate = cachedSquad;
-              }
-
-              if (draftCandidate && draftCandidate.player_ids.length === 11) {
-                const loadedSquad = draftCandidate.player_ids.map((pId) => res.data.all_players.find((ap) => ap.id === pId)).filter(Boolean);
-                if (loadedSquad.length === 11) {
-                  setSelectedPlayers(loadedSquad);
-                  setSavedSignature(JSON.stringify([selectedMatch.id, loadedSquad.map((p) => p.id), draftCandidate.captain_id, draftCandidate.vice_captain_id]));
-                  setCaptainId(draftCandidate.captain_id);
-                  setViceCaptainId(draftCandidate.vice_captain_id);
-
-                  // Auto-submit to backend so user immediately appears in database and leaderboard!
-                  if (!isCurrentMatchLocked) {
-                    api.post('/teams', {
-                      match_id: selectedMatch.id,
-                      player_ids: draftCandidate.player_ids,
-                      captain_id: draftCandidate.captain_id,
-                      vice_captain_id: draftCandidate.vice_captain_id
-                    }).then(() => {
-                      localStorage.removeItem('pending_fantasy_squad');
-                      setSaveToast({
-                        type: 'success',
-                        text: 'Your 11-player squad has been saved and registered on the leaderboard!'
-                      });
-                      loadMatches();
-                    }).catch(() => {});
-                  }
-                } else if (!matchChanged) {
-                  // Keep whatever is currently selected
-                } else {
-                  setSelectedPlayers([]);
-                  setCaptainId(null);
-                  setViceCaptainId(null);
-                }
-              } else if (!matchChanged && selectedPlayers.length > 0) {
-                // Keep active in-memory draft
-              } else {
-                setSelectedPlayers([]);
-                setCaptainId(null);
-                setViceCaptainId(null);
-              }
-            }
-          } catch (e) {
-            if (cachedSquad && Array.isArray(cachedSquad.player_ids) && cachedSquad.player_ids.length === 11) {
-              const loadedSquad = cachedSquad.player_ids.map((pId) => res.data.all_players.find((ap) => ap.id === pId)).filter(Boolean);
-              if (loadedSquad.length === 11) {
-                setSelectedPlayers(loadedSquad);
-                setCaptainId(cachedSquad.captain_id);
-                setViceCaptainId(cachedSquad.vice_captain_id);
-              }
-            }
-            setLoadError('Could not load your saved team. Your database team has not been removed. Reload before editing.');
-          }
+        setCategorizedPlayers(roster.data.categorized_players); setAllPlayers(roster.data.all_players);
+        let ids = [], c = null, vc = null;
+        if (saved?.data.has_team) {
+          const team = saved.data.team;
+          ids = team.players.map(p=>p.id); c = team.captain_id; vc = team.vice_captain_id;
+          setTeamRevision(team.revision || 0);
+          setSavedSignature(JSON.stringify([selectedMatch.id,ids,c,vc]));
+          try { localStorage.removeItem('fantasy_pending_guest'); } catch {}
         } else {
-          // Logged out / Guest user: restore previous draft for this match if available
-          let draftCandidate = null;
-          if (draftRef.current.matchId === selectedMatch.id && draftRef.current.playerIds.length > 0) {
-            draftCandidate = {
-              player_ids: draftRef.current.playerIds,
-              captain_id: draftRef.current.captainId,
-              vice_captain_id: draftRef.current.viceCaptainId
-            };
-          } else if (cachedSquad && Array.isArray(cachedSquad.player_ids) && cachedSquad.player_ids.length > 0) {
-            draftCandidate = cachedSquad;
-          }
-
-          if (draftCandidate && draftCandidate.player_ids.length > 0) {
-            const loadedSquad = draftCandidate.player_ids.map((pId) => res.data.all_players.find((ap) => ap.id === pId)).filter(Boolean);
-            if (loadedSquad.length > 0) {
-              setSelectedPlayers(loadedSquad);
-              if (draftCandidate.captain_id) setCaptainId(draftCandidate.captain_id);
-              if (draftCandidate.vice_captain_id) setViceCaptainId(draftCandidate.vice_captain_id);
+          try {
+            const raw = localStorage.getItem(draftKey) || (user ? localStorage.getItem('fantasy_pending_guest') : null);
+            const draft = raw ? JSON.parse(raw) : null;
+            if (draft?.match_id === selectedMatch.id && Array.isArray(draft.player_ids)) {
+              ids = draft.player_ids; c = draft.captain_id; vc = draft.vice_captain_id;
             }
-          } else if (matchChanged) {
-            setSelectedPlayers([]);
-            setCaptainId(null);
-            setViceCaptainId(null);
-          }
+            if (user) localStorage.removeItem('fantasy_pending_guest');
+          } catch {}
         }
+        const players = ids.map(id=>roster.data.all_players.find(p=>p.id===id)).filter(Boolean);
+        setSelectedPlayers(players);
+        setCaptainId(players.some(p=>p.id===c) ? c : null);
+        setViceCaptainId(players.some(p=>p.id===vc) ? vc : null);
+        setLoadedScope(scope);
       } catch (err) {
-        console.error('Failed to load players:', err);
+        if (!cancelled) setTeamLoadError(err.response?.data?.detail || 'Could not load your saved team. Retry before editing.');
       }
-    };
-    fetchPlayers();
+    })();
     return () => { cancelled = true; };
-  }, [selectedMatch?.id, user?.id]);
+  }, [selectedMatch?.id, user?.id, authLoading, reloadTeam]);
 
   // Validate Team Selection in real-time
   useEffect(() => {
@@ -509,12 +390,14 @@ function App() {
   };
 
   const handleRemovePlayer = (playerId) => {
+    if (isCurrentMatchLocked) return;
     setSelectedPlayers((prev) => prev.filter((p) => p.id !== playerId));
     if (captainId === playerId) setCaptainId(null);
     if (viceCaptainId === playerId) setViceCaptainId(null);
   };
 
   const handleSetCaptain = (playerId) => {
+    if (isCurrentMatchLocked) return;
     if (viceCaptainId === playerId) {
       setViceCaptainId(captainId);
     }
@@ -522,6 +405,7 @@ function App() {
   };
 
   const handleSetViceCaptain = (playerId) => {
+    if (isCurrentMatchLocked) return;
     if (captainId === playerId) {
       setCaptainId(viceCaptainId);
     }
@@ -530,6 +414,7 @@ function App() {
 
   // Save Team to Backend
   const handleSaveTeam = async () => {
+    if (saveInFlight.current) return;
     if (isCurrentMatchLocked) {
       alert('Lineup submissions are strictly locked for this match (deadline / admin lock). Team modifications are not permitted.');
       return;
@@ -543,8 +428,7 @@ function App() {
           vice_captain_id: viceCaptainId,
         };
         try {
-          localStorage.setItem('pending_fantasy_squad', JSON.stringify(pending));
-          localStorage.setItem('fantasy_draft_m' + selectedMatch.id, JSON.stringify(pending));
+          localStorage.setItem('fantasy_pending_guest', JSON.stringify(pending));
         } catch (e) {}
       }
       setIsAuthOpen(true);
@@ -563,6 +447,11 @@ function App() {
       return;
     }
 
+    if (validationErrors.length) {
+      setSaveToast({type:'error',text:validationErrors.join(' ')}); return;
+    }
+    saveInFlight.current = true;
+    const savingScope = scope;
     setIsSubmitting(true);
     setSaveToast(null);
 
@@ -572,17 +461,13 @@ function App() {
         player_ids: selectedPlayers.map((p) => p.id),
         captain_id: captainId,
         vice_captain_id: viceCaptainId,
+        revision: teamRevision,
       };
-      await api.post('/teams', payload);
+      const response = await api.post('/teams', payload);
+      window.dispatchEvent(new Event('fantasy:teams-updated'));
+      if (scopeRef.current !== savingScope) return;
+      setTeamRevision(response.data.revision);
       setSavedSignature(squadSignature);
-
-      // Persist permanently in browser localStorage across all sessions
-      const storageKey = 'fantasy_squad_m' + selectedMatch.id + (user ? '_u' + user.id : '');
-      try {
-        localStorage.setItem(storageKey, JSON.stringify(payload));
-        localStorage.setItem('fantasy_squad_m' + selectedMatch.id, JSON.stringify(payload));
-        localStorage.removeItem('pending_fantasy_squad');
-      } catch (e) {}
 
       setSaveToast({
         type: 'success',
@@ -592,12 +477,13 @@ function App() {
       setIsMobilePitchOpen(false);
       loadMatches();
     } catch (err) {
-      console.error('Failed to save team:', err);
+      if (scopeRef.current !== savingScope) return;
       setSaveToast({
         type: 'error',
         text: err.response?.data?.detail || 'Failed to save lineup. Please review requirements.',
       });
     } finally {
+      saveInFlight.current = false;
       setIsSubmitting(false);
     }
   };
@@ -610,45 +496,7 @@ function App() {
       setInspectedTeamDetails(res.data);
       setInspectedTeamId(teamId);
     } catch (err) {
-      if (user && (teamId === user.id || teamId === 'local_' + user.id || String(teamId) === String(user.id)) && selectedPlayers.length === 11) {
-        const categorized = { WK: [], BAT: [], AR: [], BOWL: [] };
-        selectedPlayers.forEach((p) => {
-          const isC = p.id === captainId;
-          const isVc = p.id === viceCaptainId;
-          const mult = isC ? 2.0 : (isVc ? 1.5 : 1.0);
-          const item = {
-            id: p.id,
-            name: p.name,
-            team: p.team,
-            role: p.role,
-            is_captain: isC,
-            is_vice_captain: isVc,
-            multiplier: mult,
-            base_points: 0.0,
-            effective_points: 0.0,
-            stat_summary: { fantasy_points: 0.0, runs: 0, wickets: 0, points_breakdown: {} }
-          };
-          if (categorized[p.role]) categorized[p.role].push(item);
-        });
-        setInspectedTeamDetails({
-          team_id: user.id,
-          fantasy_team_name: user.fantasy_team_name || 'My Fantasy XI',
-          full_name: user.full_name || 'My Team',
-          avatar_url: user.avatar_url,
-          total_points: 0.0,
-          rank: 1,
-          match: {
-            id: selectedMatch?.id || 4,
-            title: selectedMatch?.title || 'Match 4: Pakistan vs England',
-            status: selectedMatch?.status || 'ACTIVE',
-            venue: selectedMatch?.venue || 'Gaddafi Stadium, Lahore'
-          },
-          categorized_players: categorized
-        });
-        setInspectedTeamId(user.id);
-      } else {
-        setSaveToast({ type: 'error', text: err.response?.data?.detail || 'Could not load lineup preview.' });
-      }
+      setSaveToast({ type: 'error', text: err.response?.data?.detail || 'Could not load lineup preview.' });
     } finally {
       setIsInspecting(false);
     }
@@ -685,7 +533,10 @@ function App() {
         {/* Active Match Dynamic Live Countdown Banner */}
         {sessionError && <p role="alert" className="mb-4 text-amber-300">{sessionError} <button className="underline" onClick={()=>window.location.reload()}>Reload</button></p>}
         {loadError && <div role="alert" className="mb-4 p-3 border border-red-500 rounded">{loadError} <button className="underline" onClick={loadMatches}>Retry</button></div>}
-        <MatchCountdownBanner match={activeMatch} />
+        <MatchCountdownBanner match={selectedMatch || activeMatch} />
+        {teamLoadError && <div role="alert" className="mb-4 p-4 rounded-xl bg-red-950 border border-red-500">{teamLoadError} <button className="underline" onClick={()=>setReloadTeam(v=>v+1)}>Retry loading team</button></div>}
+        {loadedScope !== scope && !teamLoadError && <p role="status" className="mb-4 text-emerald-200">Loading players and saved team…</p>}
+        {user && <button className="mb-3 text-sm underline text-emerald-300" disabled={isSubmitting} onClick={()=>{ if (selectedPlayers.length && !isSquadSaved && !window.confirm('Replace unsaved picks with your server team?')) return; setReloadTeam(v=>v+1); }}>Reload saved team from server</button>}
         {user && selectedPlayers.length>0 && !isSquadSaved && <p className="mb-4 text-amber-300" role="status">Unsaved changes — use Save Lineup to submit your team.</p>}
 
         {/* Schedule & Fixture Carousel (Top of Page) */}
@@ -732,6 +583,9 @@ function App() {
             {/* Left 60% Panel: Team Builder (Roles, Cards, Filters) */}
             <div className="lg:col-span-7 space-y-4">
               <TeamBuilder
+                key={scope}
+                isSubmitting={isSubmitting}
+                isSquadSaved={isSquadSaved}
                 categorizedPlayers={categorizedPlayers}
                 allPlayers={allPlayers}
                 selectedPlayers={selectedPlayers}
@@ -780,7 +634,7 @@ function App() {
             activeMatchId={selectedMatch?.id || 4}
             onInspectTeam={handleInspectTeam}
             onBuildTeam={() => {
-              const m4 = matches.find((m) => m.id === 4) || activeMatch;
+              const m4 = activeMatch;
               if (m4) setSelectedMatch(m4);
               setActiveTab('builder');
             }}
@@ -798,7 +652,7 @@ function App() {
             activeMatch={activeMatch}
             onSimulationComplete={loadMatches}
             onLockToggle={loadMatches}
-            onOpenAuth={() => setIsAuthModalOpen(true)}
+            onOpenAuth={() => setIsAuthOpen(true)}
           />
         )}
 
@@ -847,11 +701,8 @@ function App() {
           if (!window.confirm(`Are you sure you want to permanently delete "${teamName || 'this team'}" (Manager: ${managerName || 'User'}) from the tournament leaderboard?`)) return;
           try {
             await api.delete(`/admin/teams/${teamId}`);
-            try {
-              const removed = JSON.parse(localStorage.getItem('admin_removed_teams') || '[]');
-              removed.push(teamId);
-              localStorage.setItem('admin_removed_teams', JSON.stringify(removed));
-            } catch (e) {}
+            window.dispatchEvent(new Event('fantasy:teams-updated'));
+            setReloadTeam(v=>v+1);
             alert(`Team "${teamName}" removed successfully by Administrator.`);
             setInspectedTeamId(null);
             setInspectedTeamDetails(null);

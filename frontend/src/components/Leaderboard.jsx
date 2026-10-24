@@ -11,309 +11,57 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam, onBuildTeam }) => 
   
   // Match-specific leaderboard state
   const [selectedMatchId, setSelectedMatchId] = useState(activeMatchId || 4);
-  const [matchLeaderboardData, setMatchLeaderboardData] = useState(() => {
-    try {
-      const c = localStorage.getItem('cached_leaderboard_m' + (activeMatchId || 4));
-      return c ? JSON.parse(c) : [];
-    } catch (e) { return []; }
-  });
+  const [matchLeaderboardData, setMatchLeaderboardData] = useState([]);
   const [matchInfo, setMatchInfo] = useState(null);
-  
-  // Overall tournament leaderboard state
-  const [overallData, setOverallData] = useState(() => {
-    try {
-      const c = localStorage.getItem('cached_leaderboard_overall');
-      return c ? JSON.parse(c) : [];
-    } catch (e) { return []; }
-  });
-  const [overallMeta, setOverallMeta] = useState({ completed_matches: 0, is_series_concluded: false });
-
-  const [loading, setLoading] = useState(matchLeaderboardData.length === 0 && overallData.length === 0);
+  const [overallData, setOverallData] = useState([]);
+  const [overallMeta, setOverallMeta] = useState({completed_matches:0,is_series_concluded:false});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [filterMyTeamOnly, setFilterMyTeamOnly] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [deletingTeamId, setDeletingTeamId] = useState(null);
-
+  const [refresh, setRefresh] = useState(0);
+  useEffect(() => { if (activeMatchId) setSelectedMatchId(activeMatchId); }, [activeMatchId]);
   useEffect(() => {
-    if (activeMatchId) {
-      setSelectedMatchId(activeMatchId);
+    let cancelled = false, running = false;
+    setLoading(true); setMatchLeaderboardData([]); setOverallData([]); setMatchInfo(null);
+    async function load() {
+      if (running) return;
+      running = true;
+      try {
+        const res = await api.get(viewMode === 'overall' ? '/leaderboard/overall' : `/leaderboard?match_id=${selectedMatchId}`);
+        if (cancelled) return;
+        if (viewMode === 'overall') { setOverallData(res.data.leaderboard); setOverallMeta(res.data); }
+        else { setMatchLeaderboardData(res.data.leaderboard); setMatchInfo(res.data.match); }
+        setError('');
+      } catch (err) {
+        if (!cancelled) setError(err.response?.data?.detail || 'Leaderboard could not refresh. Displayed results may be out of date.');
+      } finally { running = false; if (!cancelled) setLoading(false); }
     }
-  }, [activeMatchId]);
-
-  useEffect(() => {
-    try {
-      const c = localStorage.getItem('cached_leaderboard_m' + selectedMatchId);
-      if (c) {
-        const parsed = JSON.parse(c);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setMatchLeaderboardData(parsed);
-        }
-      }
-    } catch (e) {}
-  }, [selectedMatchId]);
-
-  // Load Match Leaderboard with resilient state merging
-  const fetchMatchLeaderboard = async (isBackground = false) => {
-    if (!isBackground && matchLeaderboardData.length === 0) setLoading(true);
-    try {
-      const res = await api.get(`/leaderboard?match_id=${selectedMatchId}`);
-      if (Array.isArray(res.data?.leaderboard)) {
-        setMatchLeaderboardData(prev => {
-          const incoming = res.data.leaderboard;
-          let adminRemoved = [];
-          try { adminRemoved = JSON.parse(localStorage.getItem('admin_removed_teams') || '[]'); } catch (e) {}
-
-          const map = new Map();
-          for (const t of prev) {
-            if (adminRemoved.includes(t.team_id) || adminRemoved.includes(t.user_id)) continue;
-            const key = t.user_id || t.team_id;
-            if (key) map.set(String(key), t);
-          }
-          for (const t of incoming) {
-            if (adminRemoved.includes(t.team_id) || adminRemoved.includes(t.user_id)) continue;
-            const key = t.user_id || t.team_id;
-            if (key) map.set(String(key), { ...(map.get(String(key)) || {}), ...t });
-          }
-          const merged = Array.from(map.values());
-          merged.sort((a, b) => b.total_points - a.total_points);
-          merged.forEach((item, idx) => {
-            item.rank = idx > 0 && merged[idx - 1].total_points === item.total_points ? merged[idx - 1].rank : idx + 1;
-          });
-          try {
-            localStorage.setItem('cached_leaderboard_m' + selectedMatchId, JSON.stringify(merged));
-          } catch (e) {}
-          return merged;
-        });
-      }
-      if (res.data?.match) setMatchInfo(res.data.match);
-    } catch (err) {
-      console.error('Failed to load match leaderboard:', err);
-    } finally {
-      if (!isBackground) setLoading(false);
-    }
-  };
-
-  // Load Overall Cumulative Leaderboard with resilient state merging
-  const fetchOverallLeaderboard = async (isBackground = false) => {
-    if (!isBackground && overallData.length === 0) setLoading(true);
-    try {
-      const res = await api.get('/leaderboard/overall');
-      if (Array.isArray(res.data?.leaderboard)) {
-        setOverallData(prev => {
-          const incoming = res.data.leaderboard;
-          let adminRemoved = [];
-          try { adminRemoved = JSON.parse(localStorage.getItem('admin_removed_teams') || '[]'); } catch (e) {}
-
-          const map = new Map();
-          for (const t of prev) {
-            if (adminRemoved.includes(t.team_id) || adminRemoved.includes(t.user_id)) continue;
-            const key = t.user_id || t.team_id;
-            if (key) map.set(String(key), t);
-          }
-          for (const t of incoming) {
-            if (adminRemoved.includes(t.team_id) || adminRemoved.includes(t.user_id)) continue;
-            const key = t.user_id || t.team_id;
-            if (key) map.set(String(key), { ...(map.get(String(key)) || {}), ...t });
-          }
-          const merged = Array.from(map.values());
-          merged.sort((a, b) => b.total_points - a.total_points);
-          merged.forEach((item, idx) => {
-            item.rank = idx > 0 && merged[idx - 1].total_points === item.total_points ? merged[idx - 1].rank : idx + 1;
-          });
-          try {
-            localStorage.setItem('cached_leaderboard_overall', JSON.stringify(merged));
-          } catch (e) {}
-          return merged;
-        });
-      }
-      if (res.data) {
-        setOverallMeta({
-          completed_matches: res.data.completed_matches || 0,
-          is_series_concluded: res.data.is_series_concluded || false,
-        });
-      }
-    } catch (err) {
-      console.error('Failed to load overall leaderboard:', err);
-    } finally {
-      if (!isBackground) setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (viewMode === 'overall') {
-      fetchOverallLeaderboard();
-    } else {
-      fetchMatchLeaderboard();
-    }
-  }, [viewMode, selectedMatchId]);
-
-  // Periodic 15s refresh without flashing or clearing the screen
-  useEffect(() => {
-    const timer = setInterval(() => {
-      if (!document.hidden) {
-        if (viewMode === 'overall') {
-          fetchOverallLeaderboard(true);
-        } else {
-          fetchMatchLeaderboard(true);
-        }
-      }
-    }, 15000);
-    return () => clearInterval(timer);
-  }, [viewMode, selectedMatchId]);
-
-  // Admin action: Permanently remove a team from leaderboard
-  const handleAdminRemoveTeam = async (teamId, teamName, managerName) => {
-    if (!user?.is_admin) return;
-    const confirmMsg = `Are you sure you want to permanently remove "${teamName || 'this team'}" (Manager: ${managerName || 'User'}) from the tournament leaderboard?\n\nThis action cannot be undone.`;
-    if (!window.confirm(confirmMsg)) return;
-
+    load();
+    const timer = setInterval(()=>{if (!document.hidden) load();},15000);
+    const update = () => load();
+    window.addEventListener('fantasy:teams-updated',update);
+    window.addEventListener('focus',update);
+    return () => {cancelled=true;clearInterval(timer);window.removeEventListener('fantasy:teams-updated',update);window.removeEventListener('focus',update);};
+  }, [viewMode,selectedMatchId,refresh]);
+  const handleAdminRemoveTeam = async (teamId, teamName) => {
+    if (!user?.is_admin || !window.confirm(`Remove ${teamName} and this manager's tournament entries?`)) return;
     setDeletingTeamId(teamId);
-    try {
-      await api.delete(`/admin/teams/${teamId}`);
-      // Remove from match leaderboard state immediately
-      setMatchLeaderboardData(prev => prev.filter(t => t.team_id !== teamId && t.user_id !== teamId));
-      // Remove from overall leaderboard state immediately
-      setOverallData(prev => prev.filter(t => t.team_id !== teamId && t.user_id !== teamId));
-
-      // Record removed ID so local browser fallback never resurrects it
-      try {
-        const removed = JSON.parse(localStorage.getItem('admin_removed_teams') || '[]');
-        removed.push(teamId);
-        localStorage.setItem('admin_removed_teams', JSON.stringify(removed));
-      } catch (e) {}
-
-      alert(`Team "${teamName || teamId}" has been permanently removed by Administrator.`);
-    } catch (err) {
-      alert(err.response?.data?.detail || 'Failed to remove team. Ensure you are signed in as administrator.');
-    } finally {
-      setDeletingTeamId(null);
-    }
+    try { await api.delete(`/admin/teams/${teamId}`); setRefresh(v=>v+1); }
+    catch (err) { setError(err.response?.data?.detail || 'Could not remove team.'); }
+    finally { setDeletingTeamId(null); }
   };
-
-  // Active match data filtering with strict 1-person-per-user deduplication
-  const displayedMatchTeams = React.useMemo(() => {
-    const seenUsers = new Set();
-    const seenEmails = new Set();
-
-    let adminRemoved = [];
-    try { adminRemoved = JSON.parse(localStorage.getItem('admin_removed_teams') || '[]'); } catch (e) {}
-
-    const list = matchLeaderboardData.filter((t) => {
-      const uId = t.user_id ? String(t.user_id) : (t.team_id ? `team_${t.team_id}` : null);
-      const email = t.email ? t.email.toLowerCase().trim() : null;
-
-      if (adminRemoved.includes(t.team_id) || adminRemoved.includes(t.user_id)) return false;
-
-      // Strict 1 team per user ID or email
-      if (uId && seenUsers.has(uId)) return false;
-      if (email && seenEmails.has(email)) return false;
-
-      if (uId) seenUsers.add(uId);
-      if (email) seenEmails.add(email);
-
-      const matchesFilter = filterMyTeamOnly && user ? String(t.user_id) === String(user.id) : true;
-      const matchesSearch = searchQuery === '' || 
-        (t.fantasy_team_name && t.fantasy_team_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (t.full_name && t.full_name.toLowerCase().includes(searchQuery.toLowerCase()));
-      return matchesFilter && matchesSearch;
-    });
-
-    // Check if the current logged in user already has their team listed
-    const isUserAlreadyListed = user && (
-      seenUsers.has(String(user.id)) ||
-      (user.email && seenEmails.has(user.email.toLowerCase().trim())) ||
-      adminRemoved.includes(user.id)
-    );
-
-    // ONLY append fallback if user is definitely NOT in the server leaderboard yet
-    if (user && !isUserAlreadyListed && !adminRemoved.includes(user.id)) {
-      try {
-        const raw = localStorage.getItem('fantasy_squad_m' + selectedMatchId + '_u' + user.id) ||
-                    localStorage.getItem('fantasy_squad_m' + selectedMatchId) ||
-                    localStorage.getItem('fantasy_draft_m' + selectedMatchId);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed && Array.isArray(parsed.player_ids) && parsed.player_ids.length === 11) {
-            list.push({
-              rank: list.length + 1,
-              team_id: user.id,
-              user_id: user.id,
-              is_verified: false,
-              fantasy_team_name: user.fantasy_team_name || 'My Fantasy XI',
-              full_name: user.full_name || 'My Team',
-              avatar_url: user.avatar_url,
-              total_points: 0.0,
-              is_winner: false
-            });
-          }
-        }
-      } catch (e) {}
-    }
-
-    return list;
-  }, [matchLeaderboardData, filterMyTeamOnly, searchQuery, user, selectedMatchId]);
-
-  // Overall tournament data filtering with strict 1-person-per-user deduplication
-  const displayedOverallTeams = React.useMemo(() => {
-    const seenUsers = new Set();
-    const seenEmails = new Set();
-
-    let adminRemoved = [];
-    try { adminRemoved = JSON.parse(localStorage.getItem('admin_removed_teams') || '[]'); } catch (e) {}
-
-    const list = overallData.filter((t) => {
-      const uId = t.user_id ? String(t.user_id) : (t.team_id ? `team_${t.team_id}` : null);
-      const email = t.email ? t.email.toLowerCase().trim() : null;
-
-      if (adminRemoved.includes(t.team_id) || adminRemoved.includes(t.user_id)) return false;
-
-      if (uId && seenUsers.has(uId)) return false;
-      if (email && seenEmails.has(email)) return false;
-
-      if (uId) seenUsers.add(uId);
-      if (email) seenEmails.add(email);
-
-      const matchesFilter = filterMyTeamOnly && user ? String(t.user_id) === String(user.id) : true;
-      const matchesSearch = searchQuery === '' ||
-        (t.fantasy_team_name && t.fantasy_team_name.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (t.full_name && t.full_name.toLowerCase().includes(searchQuery.toLowerCase()));
-      return matchesFilter && matchesSearch;
-    });
-
-    const isUserAlreadyListed = user && (
-      seenUsers.has(String(user.id)) ||
-      (user.email && seenEmails.has(user.email.toLowerCase().trim())) ||
-      adminRemoved.includes(user.id)
-    );
-
-    if (user && !isUserAlreadyListed && !adminRemoved.includes(user.id)) {
-      try {
-        const raw = localStorage.getItem('fantasy_squad_m4_u' + user.id) || 
-                    localStorage.getItem('fantasy_squad_m4') ||
-                    localStorage.getItem('fantasy_draft_m4');
-        if (raw) {
-          list.push({
-            rank: list.length + 1,
-            user_id: user.id,
-            team_id: user.id,
-            is_verified: false,
-            full_name: user.full_name || 'My Team',
-            fantasy_team_name: user.fantasy_team_name || 'My Fantasy XI',
-            avatar_url: user.avatar_url,
-            matches_played: 1,
-            total_points: 0.0,
-            match_scores: { 4: 0.0 }
-          });
-        }
-      } catch (e) {}
-    }
-
-    return list;
-  }, [overallData, filterMyTeamOnly, searchQuery, user]);
+  const filter = t => (!filterMyTeamOnly || t.user_id === user?.id) &&
+    `${t.fantasy_team_name} ${t.full_name}`.toLowerCase().includes(searchQuery.toLowerCase());
+  const displayedMatchTeams = matchLeaderboardData.filter(filter);
+  const displayedOverallTeams = overallData.filter(filter);
 
   const isMatchCompleted = matchInfo?.status === 'COMPLETED';
 
   return (
     <div className="w-full max-w-5xl mx-auto space-y-6">
+      {error && <div role="alert" className="p-4 bg-red-950 border border-red-500 rounded-xl">{error} <button onClick={()=>setRefresh(v=>v+1)} className="underline">Retry</button></div>}
       
       {/* Top Header Card & View Mode Switcher */}
       <div className="bg-[#031a14] border border-emerald-900/80 rounded-2xl p-5 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -447,7 +195,7 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam, onBuildTeam }) => 
               </div>
               <div>
                 <span className="text-[10px] font-black uppercase tracking-wider text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-500/40">
-                  {overallMeta.completed_matches} OF 6 MATCHES COMPLETED
+                  {overallMeta.completed_matches} OF {matches.length} MATCHES COMPLETED
                 </span>
                 <h3 className="text-base sm:text-lg font-black text-white mt-1">
                   Overall Series Championship Leaderboard
@@ -459,9 +207,9 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam, onBuildTeam }) => 
             </div>
 
             <div className="text-center sm:text-right flex-shrink-0">
-              <span className="text-[10px] uppercase font-bold text-slate-400">Pre-Tournament Status</span>
+              <span className="text-[10px] uppercase font-bold text-slate-400">Tournament Status</span>
               <div className="text-xs font-black text-amber-400 bg-black/40 px-3 py-1.5 rounded-lg border border-emerald-800">
-                {overallMeta.completed_matches === 0 ? 'Awaiting results' : `${overallMeta.completed_matches}/6 Matches Live`}
+                {overallMeta.completed_matches === 0 ? 'Awaiting results' : `${overallMeta.completed_matches}/${matches.length} Matches Completed`}
               </div>
             </div>
           </div>
@@ -470,7 +218,7 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam, onBuildTeam }) => 
           <div className="bg-[#031a14] border border-emerald-900/80 rounded-2xl shadow-xl overflow-hidden">
             <div className="p-4 border-b border-emerald-900/80 flex items-center justify-between bg-emerald-950/40">
               <span className="text-xs font-extrabold uppercase tracking-wider text-slate-300">
-                All Enrolled Managers ({displayedOverallTeams.length})
+                Managers with submitted teams ({displayedOverallTeams.length})
               </span>
               <span className="text-[11px] text-amber-400 font-semibold">
                 Ranked by Total Cumulative Points Across All Fixtures
@@ -485,14 +233,14 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam, onBuildTeam }) => 
               <div className="py-12 text-center text-sm text-slate-400 space-y-3">
                 <p>No fantasy squads enrolled yet.</p>
                 <p className="text-xs text-amber-400">
-                  Sign up and build your lineup for Match 4 (Oct 25: Pakistan vs England) to enter the Series Championship!
+                  Save your lineup for the active match to enter the Series Championship!
                 </p>
                 {onBuildTeam && (
                   <button
                     onClick={onBuildTeam}
                     className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-emerald-950 font-black text-xs hover:brightness-110 shadow-lg cursor-pointer"
                   >
-                    ⚡ Build Team for Match 4 Now
+                    ⚡ Build Team for Active Match
                   </button>
                 )}
               </div>
@@ -579,7 +327,7 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam, onBuildTeam }) => 
                             </span>
                           ))}
                           <span className="text-[11px] text-slate-400 font-semibold ml-1">
-                            ({entry.matches_played}/6 matches)
+                            ({entry.matches_played} submitted matches)
                           </span>
                         </div>
 
@@ -648,7 +396,7 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam, onBuildTeam }) => 
               <div className="text-center sm:text-right">
                 <span className="text-[10px] uppercase font-bold text-slate-400">Match Phase</span>
                 <div className="text-xs font-black text-amber-400 bg-black/40 px-3 py-1.5 rounded-lg border border-emerald-800">
-                  0 PTS (Pre-Match Registration)
+                  {matchInfo?.status === 'LIVE' ? 'Live • admin score updates' : 'Teams submitted • awaiting start'}
                 </div>
               </div>
             </div>
@@ -721,7 +469,7 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam, onBuildTeam }) => 
                     onClick={onBuildTeam}
                     className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-emerald-950 font-black text-xs hover:brightness-110 shadow-lg cursor-pointer"
                   >
-                    ⚡ Build Team for Match 4 Now
+                    ⚡ Build Team for Active Match
                   </button>
                 )}
               </div>

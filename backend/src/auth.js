@@ -24,32 +24,6 @@ function createAccessToken(user) {
   );
 }
 
-function restoreUserFromPayload(payload) {
-  if (!payload || !payload.sub || !payload.email) return null;
-  const numId = parseInt(payload.sub, 10);
-  let user = db.getUserById(numId);
-  if (!user) {
-    const adminEmail = (process.env.ADMIN_EMAIL || 'ahmad@tahseen.pk').toLowerCase().trim();
-    const isAdmin = Boolean(payload.is_admin || (payload.email && payload.email.toLowerCase().trim() === adminEmail));
-    user = {
-      id: numId,
-      email: payload.email,
-      full_name: payload.full_name || '',
-      fantasy_team_name: payload.fantasy_team_name || '',
-      is_admin: isAdmin,
-      is_verified: true,
-      token_version: payload.version || 0,
-      avatar_url: null,
-      created_at: new Date().toISOString()
-    };
-    db.users.push(user);
-    if (numId >= db.nextUserId) {
-      db.nextUserId = numId + 1;
-    }
-  }
-  return user;
-}
-
 function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -60,11 +34,8 @@ function authMiddleware(req, res, next) {
   try {
     const payload = jwt.verify(token, SECRET_KEY);
     let user = db.getUserById(payload.sub);
-    if (!user && payload.email) {
-      user = restoreUserFromPayload(payload);
-    }
     if (!user || (payload.version || 0) !== (user.token_version || 0)) {
-      return res.status(404).json({ detail: 'User not found' });
+      return res.status(401).json({ detail: 'Session expired. Please sign in again.' });
     }
     req.user = user;
     next();
@@ -75,7 +46,7 @@ function authMiddleware(req, res, next) {
 
 function adminMiddleware(req, res, next) {
   return authMiddleware(req, res, () => {
-    const adminEmail = (process.env.ADMIN_EMAIL || 'ahmad@tahseen.pk').toLowerCase().trim();
+    const adminEmail = (process.env.ADMIN_EMAIL || 'admin@fantasy.local').toLowerCase().trim();
     const isAdmin = Boolean(req.user.is_admin || (req.user.email && req.user.email.toLowerCase().trim() === adminEmail));
     if (!isAdmin) {
       return res.status(403).json({ detail: 'Only the tournament administrator can do this.' });
@@ -96,10 +67,7 @@ function optionalAuthMiddleware(req, res, next) {
   try {
     const payload = jwt.verify(token, SECRET_KEY);
     let user = db.getUserById(payload.sub);
-    if (!user && payload.email) {
-      user = restoreUserFromPayload(payload);
-    }
-    if (user && (payload.version || 0) !== (req.user?.token_version || 0)) user = null;
+    if (user && (payload.version || 0) !== (user.token_version || 0)) user = null;
     req.user = user;
   } catch (err) {
     req.user = null;
@@ -108,7 +76,7 @@ function optionalAuthMiddleware(req, res, next) {
 }
 
 function formatUserResponse(user) {
-  const adminEmail = (process.env.ADMIN_EMAIL || 'ahmad@tahseen.pk').toLowerCase().trim();
+  const adminEmail = (process.env.ADMIN_EMAIL || 'admin@fantasy.local').toLowerCase().trim();
   const isAdmin = Boolean(user.is_admin || (user.email && user.email.toLowerCase().trim() === adminEmail));
   const fName = user.full_name || (user.email ? user.email.split('@')[0] : 'Cricket Fan');
   const tName = user.fantasy_team_name || `${fName} XI`;
@@ -164,11 +132,6 @@ router.post('/signup', (req, res) => {
 
   const token = createAccessToken(newUser);
 
-  if (process.env.NODE_ENV !== 'test') {
-    const defaultName = (full_name && full_name.trim()) || email.split('@')[0];
-    const defaultTeamName = (fantasy_team_name && fantasy_team_name.trim()) || `${defaultName} XI`;
-    db.ensureUserEnrolledInTournament(newUser.id, newUser.email, defaultName, defaultTeamName, newUser.avatar_url);
-  }
 
   return res.json({
     access_token: token,
@@ -186,33 +149,7 @@ router.post('/login', (req, res) => {
   }
 
   const cleanEmail = email.toLowerCase().trim();
-  const adminEmail = (process.env.ADMIN_EMAIL || 'ahmad@tahseen.pk').toLowerCase().trim();
-  const adminPassword = process.env.ADMIN_PASSWORD || 'Password123!';
-
-  let user = db.getUserByEmail(cleanEmail);
-
-  if (cleanEmail === adminEmail && password === adminPassword) {
-    if (!user) {
-      const salt = bcrypt.genSaltSync(10);
-      user = db.createUser({
-        email: adminEmail,
-        hashed_password: bcrypt.hashSync(adminPassword, salt),
-        full_name: 'Ahmad Tahseen',
-        fantasy_team_name: 'Lahore Royals XI',
-        is_admin: true,
-        is_verified: true
-      });
-    } else {
-      user.is_admin = true;
-      user.hashed_password = bcrypt.hashSync(adminPassword, 10);
-    }
-    const token = createAccessToken(user);
-    return res.json({
-      access_token: token,
-      token_type: 'bearer',
-      user: formatUserResponse(user)
-    });
-  }
+  const user = db.getUserByEmail(cleanEmail);
 
   if (!user || !user.hashed_password || !bcrypt.compareSync(password, user.hashed_password)) {
     return res.status(400).json({ detail: 'Incorrect email or password' });
@@ -220,11 +157,6 @@ router.post('/login', (req, res) => {
 
   const token = createAccessToken(user);
 
-  if (process.env.NODE_ENV !== 'test') {
-    const defaultName = user.full_name || user.email.split('@')[0];
-    const defaultTeamName = user.fantasy_team_name || `${defaultName} XI`;
-    db.ensureUserEnrolledInTournament(user.id, user.email, defaultName, defaultTeamName, user.avatar_url);
-  }
 
   return res.json({
     access_token: token,

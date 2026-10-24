@@ -30,58 +30,7 @@ function rankTeams(teams) {
   });
 }
 
-function standings() {
-  const result = ['PAK', 'ENG', 'SL'].map(team => ({
-    team, played: 0, won: 0, lost: 0, tied: 0, no_result: 0, points: 0, nrr: 0,
-    forRuns: 0, againstRuns: 0, forBalls: 0, againstBalls: 0
-  }));
-
-  for (const m of db.matches.filter(m => m.status === 'COMPLETED' && m.match_number !== 7)) {
-    const a = result.find(s => s.team === m.team_a);
-    const b = result.find(s => s.team === m.team_b);
-    if (!a || !b) continue;
-
-    a.played++;
-    b.played++;
-
-    if (m.result === 'NO_RESULT') {
-      a.no_result++; b.no_result++; a.points++; b.points++;
-      continue;
-    }
-
-    if (m.result === 'TIE') {
-      a.tied++; b.tied++; a.points++; b.points++;
-    } else {
-      const w = m.winner_team === a.team ? a : b;
-      const l = w === a ? b : a;
-      w.won++;
-      w.points += 2;
-      l.lost++;
-    }
-
-    if (m.innings && m.innings.a && m.innings.b) {
-      const x = m.innings.a;
-      const y = m.innings.b;
-      const xb = x.wickets === 10 ? 300 : (x.balls || 300);
-      const yb = y.wickets === 10 ? 300 : (y.balls || 300);
-      a.forRuns += x.runs;
-      a.againstRuns += y.runs;
-      a.forBalls += xb;
-      a.againstBalls += yb;
-      b.forRuns += y.runs;
-      b.againstRuns += x.runs;
-      b.forBalls += yb;
-      b.againstBalls += xb;
-    }
-  }
-
-  for (const s of result) {
-    s.nrr = s.forBalls && s.againstBalls
-      ? Number((6 * s.forRuns / s.forBalls - 6 * s.againstRuns / s.againstBalls).toFixed(3))
-      : 0;
-  }
-  db.standings = result;
-}
+function standings() { db.standings = require('./standings')(db.matches); }
 
 router.get('/matches/:id/stats', (req, res) => {
   const m = matchFor(req.params.id);
@@ -95,8 +44,8 @@ router.get('/matches/:id/stats', (req, res) => {
 
 router.post('/matches/:id/config', (req, res) => {
   const m = matchFor(req.params.id);
-  if (m.status === 'COMPLETED' && process.env.NODE_ENV !== 'test') fail('Completed fixtures cannot be rescheduled.');
-  if ((m.is_locked || m.status === 'LIVE' || db.getPlayerMatchStats(m.id).length) && process.env.NODE_ENV !== 'test') fail('Unlock an unscored match before rescheduling.');
+  if (m.status === 'COMPLETED') fail('Completed fixtures cannot be rescheduled.');
+  if ((m.is_locked || m.status === 'LIVE' || db.getPlayerMatchStats(m.id).length)) fail('Unlock an unscored match before rescheduling.');
 
   const { match_date, venue, is_active } = req.body;
   const parsed = Date.parse(match_date);
@@ -107,22 +56,19 @@ router.post('/matches/:id/config', (req, res) => {
   m.match_date = new Date(parsed).toISOString();
   if (venue !== undefined) m.venue = text(venue, 'Venue', 1, 160);
   if (is_active !== undefined) m.is_active = Boolean(is_active);
-  if (process.env.NODE_ENV === 'test') {
-    m.status = 'ACTIVE';
-    m.is_active = true;
-    m.is_locked = false;
-  }
+  if (is_active === true) { for (const other of db.matches) other.is_active = other.id === m.id; m.status = 'ACTIVE'; }
   res.json({ message: 'Match schedule saved.', match: m });
 });
 
 router.post('/toggle-lock/:id', (req, res) => {
   const m = matchFor(req.params.id);
-  if (m.status === 'COMPLETED' && process.env.NODE_ENV !== 'test') fail('Only active unfinished matches can be locked or unlocked.');
+  if (m.status === 'COMPLETED') fail('Only active unfinished matches can be locked or unlocked.');
   if (!m.is_active) {
     for (const other of db.matches) other.is_active = false;
     m.is_active = true;
   }
   if (m.is_locked) {
+    if (db.getPlayerMatchStats(m.id).length || Date.now() >= Date.parse(m.match_date)) fail('Cannot reopen a started or scored match.');
     m.is_locked = false;
     m.admin_unlocked = true;
     m.status = 'ACTIVE';
@@ -140,12 +86,12 @@ router.post('/toggle-lock/:id', (req, res) => {
 
 router.post('/matches/:id/activate', (req, res) => {
   const m = matchFor(req.params.id);
-  for (const other of db.matches) other.is_active = false;
-  m.is_active = true;
-  m.status = 'ACTIVE';
-  m.is_locked = false;
-  m.admin_unlocked = true;
-  res.json({ message: `${m.title} is now active and open for squad selection!`, match: m });
+  if (m.status === 'COMPLETED' || m.status === 'LIVE' || db.getPlayerMatchStats(m.id).length) fail('A started or completed fixture cannot be reopened.');
+  if (m.team_selection_disabled || [m.team_a,m.team_b].includes('TBD')) fail('This fixture is not available for selection.');
+  if (Date.now() >= Date.parse(m.match_date)) fail('Set a future start time before activating this fixture.');
+  for (const other of db.matches) other.is_active = other.id === m.id;
+  m.status = 'ACTIVE'; m.is_locked = false;
+  res.json({ message: `${m.title} is now active for squad selection.`, match: m });
 });
 
 function innings(value, name) {
@@ -241,17 +187,10 @@ router.post('/matches/:id/stats', (req, res) => {
     if (result === 'WIN' && ![m.team_a, m.team_b].includes(winner_team)) fail('Select the winning team.');
     if (result !== 'NO_RESULT') {
       for (const team of [m.team_a, m.team_b]) {
-        let playingCount = rows.filter(s => s.played_xi && roster.find(p => p.id === s.player_id).team === team).length;
-        if (playingCount < 11) {
-          for (const s of rows) {
-            const p = roster.find(x => x.id === s.player_id);
-            if (p && p.team === team && !s.played_xi && playingCount < 11) {
-              s.played_xi = true;
-              playingCount++;
-            }
-          }
-        }
+        const playingCount = rows.filter(s => s.played_xi && roster.find(p => p.id === s.player_id).team === team).length;
+        if (playingCount !== 11) fail(`Select the actual 11 playing players for ${team} before finalizing.`);
       }
+
       ins = { a: innings(rawInnings?.a, m.team_a), b: innings(rawInnings?.b, m.team_b) };
       if (result === 'TIE' && ins.a.runs !== ins.b.runs) fail('Tied innings must have equal runs.');
       if (result === 'WIN' && ((winner_team === m.team_a && ins.a.runs <= ins.b.runs) || (winner_team === m.team_b && ins.b.runs <= ins.a.runs))) {
@@ -260,6 +199,7 @@ router.post('/matches/:id/stats', (req, res) => {
     }
   }
 
+  const wasCompleted = m.status === 'COMPLETED';
   // All validation complete before mutating durable state
   db.savePlayerMatchStats(m.id, rows);
   m.is_locked = true;
@@ -274,7 +214,7 @@ router.post('/matches/:id/stats', (req, res) => {
     }
   }
 
-  const teams = db.getFantasyTeamsByMatch(m.id);
+  const teams = db.getFantasyTeamsByMatch(m.id).filter(t => db.isSubmittedTeam(t));
   for (const t of teams) {
     const selected = Object.fromEntries(t.player_ids.map(id => [id, points[id] || 0]));
     t.total_points = calculateTeamPoints(selected, t.captain_id, t.vice_captain_id).totalPoints;
@@ -293,7 +233,7 @@ router.post('/matches/:id/stats', (req, res) => {
     standings();
 
     const next = db.matches.find(n => n.match_number === m.match_number + 1);
-    if (next && next.status !== 'COMPLETED') {
+    if (!wasCompleted && next && next.status !== 'COMPLETED') {
       for (const other of db.matches) other.is_active = false;
       next.is_active = true;
       next.status = 'ACTIVE';
@@ -304,7 +244,7 @@ router.post('/matches/:id/stats', (req, res) => {
     if (final && db.matches.filter(n => n.match_number < 7).every(n => n.status === 'COMPLETED')) {
       const top = db.getStandings().slice(0, 2);
       if (final.team_a !== top[0].team || final.team_b !== top[1].team) {
-        if (db.getFantasyTeamsByMatch(final.id).length || db.getPlayerMatchStats(final.id).length) {
+        if (db.getFantasyTeamsByMatch(final.id).some(t => db.isSubmittedTeam(t)) || db.getPlayerMatchStats(final.id).length) {
           fail('This correction changes finalists after final lineups were submitted.');
         }
         final.team_a = top[0].team;
@@ -323,17 +263,29 @@ router.post('/matches/:id/stats', (req, res) => {
 router.get('/players', (req, res) => {
   res.json({
     players: db.players,
-    editable: db.fantasyTeams.length === 0 && db.playerMatchStats.length === 0
+    editable: !db.fantasyTeams.some(t => db.isSubmittedTeam(t)) && db.playerMatchStats.length === 0
   });
 });
 
 router.post('/players', (req, res) => {
-  if (db.fantasyTeams.length || db.playerMatchStats.length) {
+  if (db.fantasyTeams.some(t => db.isSubmittedTeam(t)) || db.playerMatchStats.length) {
     fail('Squads cannot change after teams or scores are saved.');
   }
   const players = req.body.players;
   if (!Array.isArray(players) || players.length < 30) fail('Invalid squad submission.');
-  db.players = players;
+  const seen = new Set();
+  const checked = players.map(p => {
+    integer(p.id, 'Player ID', 1);
+    if (seen.has(p.id)) fail('Duplicate player ID.');
+    seen.add(p.id);
+    if (!['PAK','ENG','SL'].includes(p.team) || !['WK','BAT','AR','BOWL'].includes(p.role)) fail('Invalid team or role.');
+    return { id:p.id, name:text(p.name,'Player name',1,80), team:p.team, role:p.role, is_captain:Boolean(p.is_captain) };
+  });
+  for (const team of ['PAK','ENG','SL']) {
+    const squad = checked.filter(p => p.team === team);
+    if (squad.length < 11 || ['WK','AR'].some(role => !squad.some(p => p.role === role)) || ['BAT','BOWL'].some(role => squad.filter(p => p.role === role).length < 3)) fail(`Squad for ${team} cannot form a valid XI.`);
+  }
+  db.players = checked;
   res.json({ message: 'Squad list updated successfully.' });
 });
 
@@ -345,7 +297,7 @@ router.post('/users/:id/password', (req, res) => {
   const user = db.getUserById(req.params.id);
   if (!user) fail('User not found.');
   const password = req.body.password;
-  if (typeof password !== 'string' || password.length < 10) fail('Password must be at least 10 characters.');
+  if (typeof password !== 'string' || password.length < 10 || Buffer.byteLength(password) > 72) fail('Password must be at least 10 characters.');
   user.hashed_password = bcrypt.hashSync(password, 10);
   user.token_version = (user.token_version || 0) + 1;
   user.reset_token = null;

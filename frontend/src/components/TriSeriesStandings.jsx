@@ -4,22 +4,24 @@ import api from '../api';
 
 const TriSeriesStandings = () => {
   const [standings, setStandings] = useState([]);
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     const fetchStandings = async () => {
       try {
         const res = await api.get('/standings');
-        setStandings(res.data);
+        if (!cancelled) { setStandings(res.data); setError(''); }
       } catch (err) {
-        console.error('Failed to load standings:', err);
+        if (!cancelled) setError('Could not refresh standings. Results may be out of date.');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
     fetchStandings();
     const timer = setInterval(fetchStandings, 15000);
-    return () => clearInterval(timer);
+    return () => { cancelled = true; clearInterval(timer); };
   }, []);
 
   const getTeamInfo = (code) => {
@@ -38,21 +40,22 @@ const TriSeriesStandings = () => {
   return (
     <div className="w-full max-w-5xl mx-auto space-y-6">
       
+      {error && <p role="alert" className="text-amber-300">{error}</p>}
       {/* Header */}
       <div className="bg-[#031a14] border border-emerald-900/80 rounded-2xl p-5 shadow-xl flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
             <Trophy className="w-5 h-5 text-amber-400" />
             <h2 className="text-lg font-black text-white uppercase tracking-wider">
-              2026 Pakistan ODI Tri-Series Official Standings Table
+              2026 Tri-Series Standings
             </h2>
           </div>
           <p className="text-xs text-emerald-300/80 mt-1">
-            Live points table after Rawalpindi Leg (as of Oct 22, 2026). Top 2 teams qualify for The Final at Gaddafi Stadium, Lahore!
+            Table calculated from completed tournament results. Top 2 teams qualify for The Final at Gaddafi Stadium, Lahore!
           </p>
         </div>
         <span className="text-xs font-bold bg-amber-400 text-emerald-950 px-2.5 py-1 rounded-full uppercase tracking-wider">
-          Official ODI
+          ODI League
         </span>
       </div>
 

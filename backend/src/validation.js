@@ -9,12 +9,8 @@ function avatar(value){
 }
 function integer(value,name,min=0,max=1000){if(!Number.isSafeInteger(value)||value<min||value>max)fail(`${name} must be a whole number between ${min} and ${max}.`);return value;}
 function deadline(match){
-  if (!match) return false;
-  if (match.status === 'COMPLETED') return true;
-  if (typeof match.is_locked === 'boolean') {
-    if (match.is_locked) return true;
-    if (match.admin_unlocked) return false;
-  }
-  return Boolean(Date.now() >= Date.parse(match.match_date));
+  if (!match) return true;
+  const start = Date.parse(match.match_date);
+  return match.status === 'COMPLETED' || match.status === 'LIVE' || Boolean(match.is_locked) || !Number.isFinite(start) || Date.now() >= start;
 }
 module.exports={fail,text,avatar,integer,deadline};
