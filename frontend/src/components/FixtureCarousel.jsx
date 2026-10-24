@@ -1,13 +1,7 @@
-import React, {useEffect, useRef} from 'react';
+import React from 'react';
 import { Calendar, MapPin, Lock, CheckCircle2, PlayCircle, Trophy, Sparkles, Clock } from 'lucide-react';
 
 const FixtureCarousel = ({ matches, selectedMatch, onSelectMatch }) => {
-  const stripRef = useRef(null);
-  useEffect(() => {
-    const strip = stripRef.current;
-    const card = strip?.querySelector(`[data-match-id="${selectedMatch?.id}"]`);
-    if (strip && card) strip.scrollLeft = card.offsetLeft - strip.offsetLeft;
-  }, [selectedMatch?.id]);
   // Flag / Team color helper
   const getTeamBadge = (team) => {
     switch (team) {
@@ -53,7 +47,7 @@ const FixtureCarousel = ({ matches, selectedMatch, onSelectMatch }) => {
         <div className="flex items-center gap-2">
           <Calendar className="w-4 h-4 text-amber-400" />
           <h2 className="text-sm font-bold uppercase tracking-wider text-slate-200">
-            Tournament fixtures
+            Official Tri-Series Fixtures (Rawalpindi & Lahore Leg)
           </h2>
         </div>
         <div className="flex items-center gap-2 text-xs">
@@ -67,7 +61,7 @@ const FixtureCarousel = ({ matches, selectedMatch, onSelectMatch }) => {
       </div>
 
       {/* Horizontal Carousel */}
-      <div ref={stripRef} className="fixture-strip flex gap-3 overflow-x-auto pb-3 snap-x snap-mandatory">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
         {matches.map((m) => {
           const isSelected = selectedMatch && selectedMatch.id === m.id;
           const isMatchActive = m.is_active;
@@ -81,12 +75,6 @@ const FixtureCarousel = ({ matches, selectedMatch, onSelectMatch }) => {
           return (
             <div
               key={m.id}
-              data-match-id={m.id}
-              role="button"
-              tabIndex={0}
-              aria-label={`Select ${m.title}`}
-              aria-pressed={Boolean(isSelected)}
-              onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();onSelectMatch(m);}}}
               onClick={() => onSelectMatch(m)}
               className={`relative cursor-pointer rounded-xl p-3.5 transition-all flex flex-col justify-between border ${
                 isSelected

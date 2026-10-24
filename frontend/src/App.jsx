@@ -152,7 +152,7 @@ const MatchCountdownBanner = ({ match }) => {
 };
 
 function App() {
-  const { user, sessionError, loading: authLoading } = useAuth();
+  const { user, sessionError } = useAuth();
 
   // Navigation & View States
   const [activeTab, setActiveTab] = useState('builder'); // 'builder' | 'leaderboard' | 'standings'
@@ -175,6 +175,7 @@ function App() {
   const [saveToast, setSaveToast] = useState(null);
   const [savedSignature, setSavedSignature] = useState(null);
   const [loadError, setLoadError] = useState('');
+  const [matchesError, setMatchesError] = useState('');
   const squadSignature = JSON.stringify([selectedMatch?.id,selectedPlayers.map(p=>p.id),captainId,viceCaptainId]);
   const isSquadSaved = savedSignature === squadSignature;
 
@@ -186,27 +187,30 @@ function App() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isRulesOpen, setIsRulesOpen] = useState(false);
 
+  const scope = `${user?.id || 'guest'}:${selectedMatch?.id || ''}`;
+  const pendingGuestDraft = useRef(null);
+  const currentScope = useRef(scope);
+  currentScope.current = scope;
   const [loadedScope, setLoadedScope] = useState(null);
-  const [teamLoadError, setTeamLoadError] = useState('');
   const [reloadTeam, setReloadTeam] = useState(0);
-  const [teamRevision, setTeamRevision] = useState(0);
-  const scope = `${user?.id || 'guest'}:${selectedMatch?.id || 0}`;
-  const scopeRef = useRef(scope);
-  scopeRef.current = scope;
-  const saveInFlight = useRef(false);
-  const draftKey = `fantasy_v3_draft:${scope}`;
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
-  const isCurrentMatchLocked = Boolean(!selectedMatch || !selectedMatch.is_selectable ||
-    selectedMatch.is_locked || now >= Date.parse(selectedMatch.match_date) ||
-    loadedScope !== scope || isSubmitting || teamLoadError || authLoading);
+  const draftKey = (matchId, owner) => `fantasy_draft_v3_m${matchId}_u${owner || 'guest'}`;
+
   useEffect(() => {
-    if (loadedScope !== scope || authLoading || teamLoadError) return;
+    if (!selectedMatch || loadedScope !== scope) return;
     try {
-      localStorage.setItem(draftKey, JSON.stringify({match_id:selectedMatch.id,
-        player_ids:selectedPlayers.map(p=>p.id),captain_id:captainId,vice_captain_id:viceCaptainId}));
+      localStorage.setItem(draftKey(selectedMatch.id, user?.id), JSON.stringify({
+        match_id: selectedMatch.id,
+        player_ids: selectedPlayers.map(p => p.id),
+        captain_id: captainId, vice_captain_id: viceCaptainId
+      }));
     } catch {}
-  }, [scope, loadedScope, selectedPlayers, captainId, viceCaptainId, authLoading, teamLoadError]);
+  }, [scope, loadedScope, selectedPlayers, captainId, viceCaptainId]);
+
+  const isCurrentMatchLocked = Boolean(
+    selectedMatch?.is_locked ||
+    selectedMatch?.status === 'LIVE' ||
+    selectedMatch?.status === 'COMPLETED'
+  );
 
   // Inspect User Team Pitch Modal (from Leaderboard)
   const [inspectedTeamId, setInspectedTeamId] = useState(null);
@@ -217,18 +221,19 @@ function App() {
   const loadMatches = async () => {
     try {
       const res = await api.get('/matches');
-      setLoadError('');
+      setMatchesError('');
       setMatches(res.data);
 
       const actRes = await api.get('/matches/active');
       setActiveMatch(actRes.data);
-      setSelectedMatch(prev => {
-        if (!prev) return actRes.data;
-        const updated = res.data.find(m => m.id === prev.id);
-        return !updated || JSON.stringify(prev) === JSON.stringify(updated) ? prev : updated;
-      });
+      if (!selectedMatch) {
+        setSelectedMatch(actRes.data);
+      } else {
+        const updated = res.data.find((m) => m.id === selectedMatch.id);
+        if (updated) setSelectedMatch(prev=>JSON.stringify(prev)===JSON.stringify(updated)?prev:updated);
+      }
     } catch (err) {
-      const msg = err.response?.data?.detail || (err.code === 'ERR_NETWORK' || !err.response ? 'The game server could not be reached. Check your connection and retry.' : 'Could not load the game. Check your connection and retry.'); setLoadError(msg);
+      const msg = err.response?.data?.detail || (err.code === 'ERR_NETWORK' || !err.response ? 'Could not reach the game server. Check your connection and retry.' : 'Could not load the game. Check your connection and retry.'); setMatchesError(msg);
     }
   };
 
@@ -241,50 +246,49 @@ function App() {
     return ()=>clearInterval(timer);
   }, [selectedMatch?.id]);
 
-  // Server is the authority for submitted teams; browser drafts are account scoped.
+  // Server data confirms a saved team. Browser drafts never count as submitted.
   useEffect(() => {
-    if (!selectedMatch || authLoading) return;
+    if (!selectedMatch) return;
     let cancelled = false;
-    setLoadedScope(null); setTeamLoadError(''); setSavedSignature(null);
+    setLoadedScope(null);
+    setLoadError('');
+    setSavedSignature(null);
     setSelectedPlayers([]); setCaptainId(null); setViceCaptainId(null);
-    setCategorizedPlayers({WK:[],BAT:[],AR:[],BOWL:[]}); setAllPlayers([]);
-    setTeamRevision(0); setIsCaptainModalOpen(false); setSaveToast(null);
-    (async () => {
+    setCategorizedPlayers({ WK: [], BAT: [], AR: [], BOWL: [] });
+    setAllPlayers([]);
+    const load = async () => {
       try {
-        const [roster, saved] = await Promise.all([
+        const [playersRes, teamRes] = await Promise.all([
           api.get(`/matches/${selectedMatch.id}/players`),
           user ? api.get(`/teams/my-team?match_id=${selectedMatch.id}`) : Promise.resolve(null)
         ]);
         if (cancelled) return;
-        setCategorizedPlayers(roster.data.categorized_players); setAllPlayers(roster.data.all_players);
-        let ids = [], c = null, vc = null;
-        if (saved?.data.has_team) {
-          const team = saved.data.team;
-          ids = team.players.map(p=>p.id); c = team.captain_id; vc = team.vice_captain_id;
-          setTeamRevision(team.revision || 0);
-          setSavedSignature(JSON.stringify([selectedMatch.id,ids,c,vc]));
-          try { localStorage.removeItem('fantasy_pending_guest'); } catch {}
-        } else {
-          try {
-            const raw = localStorage.getItem(draftKey) || (user ? localStorage.getItem('fantasy_pending_guest') : null);
-            const draft = raw ? JSON.parse(raw) : null;
-            if (draft?.match_id === selectedMatch.id && Array.isArray(draft.player_ids)) {
-              ids = draft.player_ids; c = draft.captain_id; vc = draft.vice_captain_id;
-            }
-            if (user) localStorage.removeItem('fantasy_pending_guest');
-          } catch {}
+        const players = playersRes.data.all_players;
+        setCategorizedPlayers(playersRes.data.categorized_players);
+        setAllPlayers(players);
+        const team = teamRes?.data.has_team ? teamRes.data.team : null;
+        let draft = null;
+        try { draft = JSON.parse(localStorage.getItem(draftKey(selectedMatch.id,user?.id)) || 'null'); } catch {}
+        if (user && pendingGuestDraft.current?.match_id === selectedMatch.id) {
+          if (!draft) draft = pendingGuestDraft.current;
+          pendingGuestDraft.current = null;
         }
-        const players = ids.map(id=>roster.data.all_players.find(p=>p.id===id)).filter(Boolean);
-        setSelectedPlayers(players);
-        setCaptainId(players.some(p=>p.id===c) ? c : null);
-        setViceCaptainId(players.some(p=>p.id===vc) ? vc : null);
+        if (team) {
+          const squad = team.players.map(p => players.find(ap => ap.id === p.id) || p);
+          setSelectedPlayers(squad); setCaptainId(team.captain_id); setViceCaptainId(team.vice_captain_id);
+          setSavedSignature(JSON.stringify([selectedMatch.id,squad.map(p => p.id),team.captain_id,team.vice_captain_id]));
+        } else if (draft?.match_id === selectedMatch.id && Array.isArray(draft.player_ids)) {
+          setSelectedPlayers(draft.player_ids.map(id => players.find(p => p.id === id)).filter(Boolean));
+          setCaptainId(draft.captain_id); setViceCaptainId(draft.vice_captain_id);
+        }
         setLoadedScope(scope);
-      } catch (err) {
-        if (!cancelled) setTeamLoadError(err.response?.data?.detail || 'Could not load your saved team. Retry before editing.');
+      } catch {
+        if (!cancelled) setLoadError('Could not load your saved team. Editing is paused to protect it. Please retry.');
       }
-    })();
+    };
+    load();
     return () => { cancelled = true; };
-  }, [selectedMatch?.id, user?.id, authLoading, reloadTeam]);
+  }, [scope, reloadTeam]);
 
   // Validate Team Selection in real-time
   useEffect(() => {
@@ -345,6 +349,7 @@ function App() {
 
   // Toggle player selection
   const handleTogglePlayer = (player) => {
+    if (loadedScope !== scope || isSubmitting || loadError) return;
     if (isCurrentMatchLocked) {
       alert('Lineup selections are strictly locked for this match (deadline / admin lock).');
       return;
@@ -390,14 +395,14 @@ function App() {
   };
 
   const handleRemovePlayer = (playerId) => {
-    if (isCurrentMatchLocked) return;
+    if (loadedScope !== scope || isSubmitting || isCurrentMatchLocked || loadError) return;
     setSelectedPlayers((prev) => prev.filter((p) => p.id !== playerId));
     if (captainId === playerId) setCaptainId(null);
     if (viceCaptainId === playerId) setViceCaptainId(null);
   };
 
   const handleSetCaptain = (playerId) => {
-    if (isCurrentMatchLocked) return;
+    if (loadedScope !== scope || isSubmitting || isCurrentMatchLocked || loadError) return;
     if (viceCaptainId === playerId) {
       setViceCaptainId(captainId);
     }
@@ -405,7 +410,7 @@ function App() {
   };
 
   const handleSetViceCaptain = (playerId) => {
-    if (isCurrentMatchLocked) return;
+    if (loadedScope !== scope || isSubmitting || isCurrentMatchLocked || loadError) return;
     if (captainId === playerId) {
       setCaptainId(viceCaptainId);
     }
@@ -414,23 +419,14 @@ function App() {
 
   // Save Team to Backend
   const handleSaveTeam = async () => {
-    if (saveInFlight.current) return;
+    if (isSubmitting || loadedScope !== scope || loadError) return;
+    const savingScope = scope;
     if (isCurrentMatchLocked) {
       alert('Lineup submissions are strictly locked for this match (deadline / admin lock). Team modifications are not permitted.');
       return;
     }
     if (!user) {
-      if (selectedPlayers.length === 11) {
-        const pending = {
-          match_id: selectedMatch.id,
-          player_ids: selectedPlayers.map((p) => p.id),
-          captain_id: captainId,
-          vice_captain_id: viceCaptainId,
-        };
-        try {
-          localStorage.setItem('fantasy_pending_guest', JSON.stringify(pending));
-        } catch (e) {}
-      }
+      pendingGuestDraft.current = {match_id:selectedMatch.id,player_ids:selectedPlayers.map(p=>p.id),captain_id:captainId,vice_captain_id:viceCaptainId};
       setIsAuthOpen(true);
       setSaveToast({
         type: 'error',
@@ -447,11 +443,6 @@ function App() {
       return;
     }
 
-    if (validationErrors.length) {
-      setSaveToast({type:'error',text:validationErrors.join(' ')}); return;
-    }
-    saveInFlight.current = true;
-    const savingScope = scope;
     setIsSubmitting(true);
     setSaveToast(null);
 
@@ -461,13 +452,19 @@ function App() {
         player_ids: selectedPlayers.map((p) => p.id),
         captain_id: captainId,
         vice_captain_id: viceCaptainId,
-        revision: teamRevision,
       };
-      const response = await api.post('/teams', payload);
-      window.dispatchEvent(new Event('fantasy:teams-updated'));
-      if (scopeRef.current !== savingScope) return;
-      setTeamRevision(response.data.revision);
+      await api.post('/teams', payload);
+      const confirmed = await api.get(`/teams/my-team?match_id=${payload.match_id}`);
+      const team = confirmed.data.team;
+      const expected = [...payload.player_ids].sort((a,b)=>a-b);
+      const actual = (team?.players || []).map(p=>p.id).sort((a,b)=>a-b);
+      if (!confirmed.data.has_team || JSON.stringify(expected) !== JSON.stringify(actual) ||
+          team.captain_id !== payload.captain_id || team.vice_captain_id !== payload.vice_captain_id) {
+        throw new Error('The saved team could not be verified. Reload before retrying.');
+      }
+      if (currentScope.current !== savingScope) return;
       setSavedSignature(squadSignature);
+      window.dispatchEvent(new Event('fantasy-team-saved'));
 
       setSaveToast({
         type: 'success',
@@ -477,13 +474,14 @@ function App() {
       setIsMobilePitchOpen(false);
       loadMatches();
     } catch (err) {
-      if (scopeRef.current !== savingScope) return;
+      if (currentScope.current !== savingScope) return;
+      setSavedSignature(null);
+      console.error('Failed to save team:', err);
       setSaveToast({
         type: 'error',
-        text: err.response?.data?.detail || 'Failed to save lineup. Please review requirements.',
+        text: err.response?.data?.detail || err.message || 'Save could not be confirmed. Reload before retrying.',
       });
     } finally {
-      saveInFlight.current = false;
       setIsSubmitting(false);
     }
   };
@@ -496,7 +494,45 @@ function App() {
       setInspectedTeamDetails(res.data);
       setInspectedTeamId(teamId);
     } catch (err) {
-      setSaveToast({ type: 'error', text: err.response?.data?.detail || 'Could not load lineup preview.' });
+      if (user && (teamId === user.id || teamId === 'local_' + user.id || String(teamId) === String(user.id)) && selectedPlayers.length === 11) {
+        const categorized = { WK: [], BAT: [], AR: [], BOWL: [] };
+        selectedPlayers.forEach((p) => {
+          const isC = p.id === captainId;
+          const isVc = p.id === viceCaptainId;
+          const mult = isC ? 2.0 : (isVc ? 1.5 : 1.0);
+          const item = {
+            id: p.id,
+            name: p.name,
+            team: p.team,
+            role: p.role,
+            is_captain: isC,
+            is_vice_captain: isVc,
+            multiplier: mult,
+            base_points: 0.0,
+            effective_points: 0.0,
+            stat_summary: { fantasy_points: 0.0, runs: 0, wickets: 0, points_breakdown: {} }
+          };
+          if (categorized[p.role]) categorized[p.role].push(item);
+        });
+        setInspectedTeamDetails({
+          team_id: user.id,
+          fantasy_team_name: user.fantasy_team_name || 'My Fantasy XI',
+          full_name: user.full_name || 'My Team',
+          avatar_url: user.avatar_url,
+          total_points: 0.0,
+          rank: 1,
+          match: {
+            id: selectedMatch?.id || 4,
+            title: selectedMatch?.title || 'Match 4: Pakistan vs England',
+            status: selectedMatch?.status || 'ACTIVE',
+            venue: selectedMatch?.venue || 'Gaddafi Stadium, Lahore'
+          },
+          categorized_players: categorized
+        });
+        setInspectedTeamId(user.id);
+      } else {
+        setSaveToast({ type: 'error', text: err.response?.data?.detail || 'Could not load lineup preview.' });
+      }
     } finally {
       setIsInspecting(false);
     }
@@ -532,11 +568,8 @@ function App() {
         
         {/* Active Match Dynamic Live Countdown Banner */}
         {sessionError && <p role="alert" className="mb-4 text-amber-300">{sessionError} <button className="underline" onClick={()=>window.location.reload()}>Reload</button></p>}
-        {loadError && <div role="alert" className="mb-4 p-3 border border-red-500 rounded">{loadError} <button className="underline" onClick={loadMatches}>Retry</button></div>}
-        <MatchCountdownBanner match={selectedMatch || activeMatch} />
-        {teamLoadError && <div role="alert" className="mb-4 p-4 rounded-xl bg-red-950 border border-red-500">{teamLoadError} <button className="underline" onClick={()=>setReloadTeam(v=>v+1)}>Retry loading team</button></div>}
-        {loadedScope !== scope && !teamLoadError && <p role="status" className="mb-4 text-emerald-200">Loading players and saved team…</p>}
-        {user && <button className="mb-3 text-sm underline text-emerald-300" disabled={isSubmitting} onClick={()=>{ if (selectedPlayers.length && !isSquadSaved && !window.confirm('Replace unsaved picks with your server team?')) return; setReloadTeam(v=>v+1); }}>Reload saved team from server</button>}
+        {(loadError || matchesError) && <div role="alert" className="mb-4 p-3 border border-red-500 rounded">{loadError || matchesError} <button className="underline" onClick={() => {loadMatches(); setReloadTeam(n => n + 1);}}>Retry</button></div>}
+        <MatchCountdownBanner match={activeMatch} />
         {user && selectedPlayers.length>0 && !isSquadSaved && <p className="mb-4 text-amber-300" role="status">Unsaved changes — use Save Lineup to submit your team.</p>}
 
         {/* Schedule & Fixture Carousel (Top of Page) */}
@@ -564,6 +597,8 @@ function App() {
           </div>
         )}
 
+        {loadedScope !== scope && !loadError && <div role="status" className="mb-4 p-3">Loading players and saved team…</div>}
+
         {/* Save Toast notification */}
         {saveToast && (
           <div className={`mb-5 p-3 rounded-xl border text-xs font-bold flex items-center justify-between shadow-lg ${
@@ -583,9 +618,6 @@ function App() {
             {/* Left 60% Panel: Team Builder (Roles, Cards, Filters) */}
             <div className="lg:col-span-7 space-y-4">
               <TeamBuilder
-                key={scope}
-                isSubmitting={isSubmitting}
-                isSquadSaved={isSquadSaved}
                 categorizedPlayers={categorizedPlayers}
                 allPlayers={allPlayers}
                 selectedPlayers={selectedPlayers}
@@ -616,7 +648,7 @@ function App() {
                 onRemovePlayer={handleRemovePlayer}
                 onSaveTeam={handleSaveTeam}
                 validationErrors={validationErrors}
-                isSubmitting={isSubmitting}
+                isSubmitting={isSubmitting || loadedScope !== scope || Boolean(loadError)}
                 teamA={selectedMatch?.team_a || 'PAK'}
                 teamB={selectedMatch?.team_b || 'ENG'}
                 isLocked={isCurrentMatchLocked}
@@ -634,7 +666,7 @@ function App() {
             activeMatchId={selectedMatch?.id || 4}
             onInspectTeam={handleInspectTeam}
             onBuildTeam={() => {
-              const m4 = activeMatch;
+              const m4 = matches.find((m) => m.id === 4) || activeMatch;
               if (m4) setSelectedMatch(m4);
               setActiveTab('builder');
             }}
@@ -652,7 +684,7 @@ function App() {
             activeMatch={activeMatch}
             onSimulationComplete={loadMatches}
             onLockToggle={loadMatches}
-            onOpenAuth={() => setIsAuthOpen(true)}
+            onOpenAuth={() => setIsAuthModalOpen(true)}
           />
         )}
 
@@ -670,7 +702,7 @@ function App() {
         onRemovePlayer={handleRemovePlayer}
         onSaveTeam={handleSaveTeam}
         validationErrors={validationErrors}
-        isSubmitting={isSubmitting}
+        isSubmitting={isSubmitting || loadedScope !== scope || Boolean(loadError)}
         teamA={selectedMatch?.team_a || 'PAK'}
         teamB={selectedMatch?.team_b || 'ENG'}
         isLocked={isCurrentMatchLocked}
@@ -687,7 +719,7 @@ function App() {
         onSelectCaptain={handleSetCaptain}
         onSelectViceCaptain={handleSetViceCaptain}
         onConfirmSave={handleSaveTeam}
-        isSubmitting={isSubmitting}
+        isSubmitting={isSubmitting || loadedScope !== scope || Boolean(loadError)}
       />
 
       {/* Inspect User Team Pitch Modal (from Leaderboard) */}
@@ -701,8 +733,7 @@ function App() {
           if (!window.confirm(`Are you sure you want to permanently delete "${teamName || 'this team'}" (Manager: ${managerName || 'User'}) from the tournament leaderboard?`)) return;
           try {
             await api.delete(`/admin/teams/${teamId}`);
-            window.dispatchEvent(new Event('fantasy:teams-updated'));
-            setReloadTeam(v=>v+1);
+            window.dispatchEvent(new Event('fantasy-team-saved'));
             alert(`Team "${teamName}" removed successfully by Administrator.`);
             setInspectedTeamId(null);
             setInspectedTeamDetails(null);

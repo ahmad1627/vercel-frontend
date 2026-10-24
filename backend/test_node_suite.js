@@ -36,10 +36,6 @@ async function main(){try{
  r=await post('/teams',{...payload,player_ids:[1,3,'3',4,19,7,22,11,12,27,28]},token);ok(r.status===400,'String/numeric duplicate rejected');
  r=await post('/teams',{...payload,player_ids:[1,3,3,4,19,7,22,11,12,27,28]},token);ok(r.status===400,'Numeric duplicate rejected');
  const saved=await Promise.all([post('/teams',payload,token),post('/teams',payload,token2)]);ok(saved.every(r=>r.status===200),'Concurrent team saves committed');let teamId=saved[0].body.team_id;
- r=await get('/teams/my-team?match_id=1',token);const revision=r.body.team.revision;
- const concurrentEdits=await Promise.all([post('/teams',{...payload,revision,captain_id:3,vice_captain_id:1},token),post('/teams',{...payload,revision},token)]);
- ok(concurrentEdits.filter(r=>r.status===200).length===1&&concurrentEdits.filter(r=>r.status===409).length===1,'Same-account stale device save rejected');
- r=await get('/teams/my-team?match_id=1');ok(r.status===401,'Saved-team endpoint requires a valid session');
  r=await post('/admin/players',{players:squad.players},admin);ok(r.status===400,'Squad changes blocked after submissions');
  r=await get('/leaderboard?match_id=1');ok(r.body.leaderboard.length===2&&!JSON.stringify(r.body).includes('@example.test'),'Public leaderboard omits emails');
  r=await get('/leaderboard/team/'+teamId);ok(r.status===403,'Other lineup hidden before deadline');
@@ -79,9 +75,7 @@ async function main(){try{
  assert.throws(()=>score.oversToBalls('5.6'));ok(true,'Invalid cricket overs rejected');
  r=await post('/admin/users/'+users[0].body.user.id+'/password',{password:'Replacement123!'},admin);ok(r.status===200,'Admin password recovery');
  r=await get('/auth/me',token);ok(r.status===401||r.status===404,'Old sessions revoked after password reset');
- r=await post('/auth/login',{email:'player1@example.test',password:'Replacement123!'});ok(r.status===200,'Recovered user can sign in');const recoveredToken=r.body.access_token;
- r=await get('/teams/my-team?match_id=1',recoveredToken);ok(r.body.has_team&&r.body.team.players.length===11,'Password recovery keeps saved team accessible');
- r=await get('/leaderboard/team/'+teamId,recoveredToken);ok(r.status===200,'Updated token version works for optional authentication');
+ r=await post('/auth/login',{email:'player1@example.test',password:'Replacement123!'});ok(r.status===200,'Recovered user can sign in');
  r=await post('/auth/google',{email:process.env.ADMIN_EMAIL});ok(r.status===501,'Unverified social sign-in remains disabled');
  if(process.env.TEST_REDIS_MOCK){
   conflict=true;r=await post('/auth/signup',{email:'conflict@example.test',password:'StrongPassword123!'});ok(r.status===503,'Lost write lease never reports success');

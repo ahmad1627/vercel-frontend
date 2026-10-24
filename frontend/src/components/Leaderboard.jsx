@@ -6,62 +6,58 @@ import api from '../api';
 const Leaderboard = ({ matches, activeMatchId, onInspectTeam, onBuildTeam }) => {
   const { user } = useAuth();
   
-  // View mode: 'overall' | 'match'
   const [viewMode, setViewMode] = useState('overall');
-  
-  // Match-specific leaderboard state
   const [selectedMatchId, setSelectedMatchId] = useState(activeMatchId || 4);
   const [matchLeaderboardData, setMatchLeaderboardData] = useState([]);
-  const [matchInfo, setMatchInfo] = useState(null);
   const [overallData, setOverallData] = useState([]);
+  const [matchInfo, setMatchInfo] = useState(null);
   const [overallMeta, setOverallMeta] = useState({completed_matches:0,is_series_concluded:false});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [filterMyTeamOnly, setFilterMyTeamOnly] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [deletingTeamId, setDeletingTeamId] = useState(null);
-  const [refresh, setRefresh] = useState(0);
-  useEffect(() => { if (activeMatchId) setSelectedMatchId(activeMatchId); }, [activeMatchId]);
+  const [loading,setLoading] = useState(true);
+  const [loadError,setLoadError] = useState('');
+  const [filterMyTeamOnly,setFilterMyTeamOnly] = useState(false);
+  const [searchQuery,setSearchQuery] = useState('');
+  const [deletingTeamId,setDeletingTeamId] = useState(null);
+  const [revision,setRevision] = useState(0);
+  useEffect(() => { if(activeMatchId) setSelectedMatchId(activeMatchId); },[activeMatchId]);
   useEffect(() => {
-    let cancelled = false, running = false;
-    setLoading(true); setMatchLeaderboardData([]); setOverallData([]); setMatchInfo(null);
-    async function load() {
-      if (running) return;
-      running = true;
+    let cancelled=false, busy=false;
+    setMatchLeaderboardData([]); setOverallData([]); setMatchInfo(null); setLoading(true);
+    const refresh=async()=>{
+      if(busy)return;busy=true;
       try {
-        const res = await api.get(viewMode === 'overall' ? '/leaderboard/overall' : `/leaderboard?match_id=${selectedMatchId}`);
-        if (cancelled) return;
-        if (viewMode === 'overall') { setOverallData(res.data.leaderboard); setOverallMeta(res.data); }
-        else { setMatchLeaderboardData(res.data.leaderboard); setMatchInfo(res.data.match); }
-        setError('');
-      } catch (err) {
-        if (!cancelled) setError(err.response?.data?.detail || 'Leaderboard could not refresh. Displayed results may be out of date.');
-      } finally { running = false; if (!cancelled) setLoading(false); }
-    }
-    load();
-    const timer = setInterval(()=>{if (!document.hidden) load();},15000);
-    const update = () => load();
-    window.addEventListener('fantasy:teams-updated',update);
-    window.addEventListener('focus',update);
-    return () => {cancelled=true;clearInterval(timer);window.removeEventListener('fantasy:teams-updated',update);window.removeEventListener('focus',update);};
-  }, [viewMode,selectedMatchId,refresh]);
-  const handleAdminRemoveTeam = async (teamId, teamName) => {
-    if (!user?.is_admin || !window.confirm(`Remove ${teamName} and this manager's tournament entries?`)) return;
+        const res=await api.get(viewMode==='overall'?'/leaderboard/overall':`/leaderboard?match_id=${selectedMatchId}`);
+        if(cancelled)return;
+        if(!Array.isArray(res.data.leaderboard))throw Error('Invalid response');
+        if(viewMode==='overall'){
+          setOverallData(res.data.leaderboard);
+          setOverallMeta({completed_matches:res.data.completed_matches,is_series_concluded:res.data.is_series_concluded});
+        }else{setMatchLeaderboardData(res.data.leaderboard);setMatchInfo(res.data.match);}
+        setLoadError('');
+      }catch{if(!cancelled)setLoadError('Leaderboard could not refresh. Displayed results may be out of date.');}
+      finally{busy=false;if(!cancelled)setLoading(false);}
+    };
+    refresh();
+    const timer=setInterval(()=>{if(!document.hidden)refresh();},15000);
+    window.addEventListener('fantasy-team-saved',refresh);
+    return()=>{cancelled=true;clearInterval(timer);window.removeEventListener('fantasy-team-saved',refresh);};
+  },[viewMode,selectedMatchId,revision]);
+  const handleAdminRemoveTeam=async(teamId,teamName)=>{
+    if(!user?.is_admin || !window.confirm(`Permanently remove the saved lineup for "${teamName}"? Other match lineups are kept.`))return;
     setDeletingTeamId(teamId);
-    try { await api.delete(`/admin/teams/${teamId}`); setRefresh(v=>v+1); }
-    catch (err) { setError(err.response?.data?.detail || 'Could not remove team.'); }
-    finally { setDeletingTeamId(null); }
+    try{await api.delete(`/admin/teams/${teamId}`);setRevision(n=>n+1);}
+    catch(err){alert(err.response?.data?.detail || 'Could not remove team.');}
+    finally{setDeletingTeamId(null);}
   };
-  const filter = t => (!filterMyTeamOnly || t.user_id === user?.id) &&
-    `${t.fantasy_team_name} ${t.full_name}`.toLowerCase().includes(searchQuery.toLowerCase());
-  const displayedMatchTeams = matchLeaderboardData.filter(filter);
-  const displayedOverallTeams = overallData.filter(filter);
+  const filterTeams=rows=>rows.filter(t=>(!filterMyTeamOnly || !user || String(t.user_id)===String(user.id)) &&
+    `${t.fantasy_team_name || ''} ${t.full_name || ''}`.toLowerCase().includes(searchQuery.toLowerCase()));
+  const displayedMatchTeams=filterTeams(matchLeaderboardData);
+  const displayedOverallTeams=filterTeams(overallData);
 
   const isMatchCompleted = matchInfo?.status === 'COMPLETED';
 
   return (
     <div className="w-full max-w-5xl mx-auto space-y-6">
-      {error && <div role="alert" className="p-4 bg-red-950 border border-red-500 rounded-xl">{error} <button onClick={()=>setRefresh(v=>v+1)} className="underline">Retry</button></div>}
+      {loadError && <div role="alert" className="p-3 border border-amber-500 rounded">{loadError} <button onClick={()=>setRevision(n=>n+1)}>Retry</button></div>}
       
       {/* Top Header Card & View Mode Switcher */}
       <div className="bg-[#031a14] border border-emerald-900/80 rounded-2xl p-5 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -195,7 +191,7 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam, onBuildTeam }) => 
               </div>
               <div>
                 <span className="text-[10px] font-black uppercase tracking-wider text-amber-300 bg-amber-950/80 px-2 py-0.5 rounded border border-amber-500/40">
-                  {overallMeta.completed_matches} OF {matches.length} MATCHES COMPLETED
+                  {overallMeta.completed_matches} OF 6 MATCHES COMPLETED
                 </span>
                 <h3 className="text-base sm:text-lg font-black text-white mt-1">
                   Overall Series Championship Leaderboard
@@ -207,9 +203,9 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam, onBuildTeam }) => 
             </div>
 
             <div className="text-center sm:text-right flex-shrink-0">
-              <span className="text-[10px] uppercase font-bold text-slate-400">Tournament Status</span>
+              <span className="text-[10px] uppercase font-bold text-slate-400">Pre-Tournament Status</span>
               <div className="text-xs font-black text-amber-400 bg-black/40 px-3 py-1.5 rounded-lg border border-emerald-800">
-                {overallMeta.completed_matches === 0 ? 'Awaiting results' : `${overallMeta.completed_matches}/${matches.length} Matches Completed`}
+                {overallMeta.completed_matches === 0 ? 'Awaiting results' : `${overallMeta.completed_matches}/6 Matches Live`}
               </div>
             </div>
           </div>
@@ -218,7 +214,7 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam, onBuildTeam }) => 
           <div className="bg-[#031a14] border border-emerald-900/80 rounded-2xl shadow-xl overflow-hidden">
             <div className="p-4 border-b border-emerald-900/80 flex items-center justify-between bg-emerald-950/40">
               <span className="text-xs font-extrabold uppercase tracking-wider text-slate-300">
-                Managers with submitted teams ({displayedOverallTeams.length})
+                All Enrolled Managers ({displayedOverallTeams.length})
               </span>
               <span className="text-[11px] text-amber-400 font-semibold">
                 Ranked by Total Cumulative Points Across All Fixtures
@@ -233,14 +229,14 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam, onBuildTeam }) => 
               <div className="py-12 text-center text-sm text-slate-400 space-y-3">
                 <p>No fantasy squads enrolled yet.</p>
                 <p className="text-xs text-amber-400">
-                  Save your lineup for the active match to enter the Series Championship!
+                  Sign up and build your lineup for Match 4 (Oct 25: Pakistan vs England) to enter the Series Championship!
                 </p>
                 {onBuildTeam && (
                   <button
                     onClick={onBuildTeam}
                     className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-emerald-950 font-black text-xs hover:brightness-110 shadow-lg cursor-pointer"
                   >
-                    ⚡ Build Team for Active Match
+                    ⚡ Build Team for Match 4 Now
                   </button>
                 )}
               </div>
@@ -327,7 +323,7 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam, onBuildTeam }) => 
                             </span>
                           ))}
                           <span className="text-[11px] text-slate-400 font-semibold ml-1">
-                            ({entry.matches_played} submitted matches)
+                            ({entry.matches_played} lineups saved)
                           </span>
                         </div>
 
@@ -396,7 +392,7 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam, onBuildTeam }) => 
               <div className="text-center sm:text-right">
                 <span className="text-[10px] uppercase font-bold text-slate-400">Match Phase</span>
                 <div className="text-xs font-black text-amber-400 bg-black/40 px-3 py-1.5 rounded-lg border border-emerald-800">
-                  {matchInfo?.status === 'LIVE' ? 'Live • admin score updates' : 'Teams submitted • awaiting start'}
+                  0 PTS (Pre-Match Registration)
                 </div>
               </div>
             </div>
@@ -469,7 +465,7 @@ const Leaderboard = ({ matches, activeMatchId, onInspectTeam, onBuildTeam }) => 
                     onClick={onBuildTeam}
                     className="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 text-emerald-950 font-black text-xs hover:brightness-110 shadow-lg cursor-pointer"
                   >
-                    ⚡ Build Team for Active Match
+                    ⚡ Build Team for Match 4 Now
                   </button>
                 )}
               </div>

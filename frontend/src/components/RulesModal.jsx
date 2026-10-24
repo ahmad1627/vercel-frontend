@@ -283,10 +283,10 @@ const RulesModal = ({ isOpen, onClose }) => {
                   Tri-Series Championship: Cumulative Total Points
                 </div>
                 <p className="text-slate-300 leading-relaxed">
-                  In addition to Daily Match winners, all points gained across the <strong className="text-white">eligible tournament matches</strong> accumulate on the <strong className="text-amber-300">Overall Series Leaderboard</strong>.
+                  In addition to Daily Match winners, all points gained across the <strong className="text-white">6 tournament matches</strong> accumulate on the <strong className="text-amber-300">Overall Series Leaderboard</strong>.
                 </p>
                 <p className="text-slate-300">
-                  At the final (Match 7), the manager with the <strong className="text-amber-300">highest total cumulative points</strong> across the entire Tri-Nation Series is crowned the <strong className="text-white">Gold Tri-Series Champion</strong>!
+                  At the final (Match 6), the manager with the <strong className="text-amber-300">highest total cumulative points</strong> across the entire Tri-Nation Series is crowned the <strong className="text-white">Gold Tri-Series Champion</strong>!
                 </p>
               </div>
             </div>

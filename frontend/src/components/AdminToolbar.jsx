@@ -339,7 +339,7 @@ export default function AdminToolbar({ activeMatch, onSimulationComplete, onRese
                   </h2>
                 </div>
                 <p className="text-xs text-slate-300 mt-1">
-                  Manage match locks, enter cricket stats, enter verified results, and crown Daily Fantasy Winners!
+                  Manage match locks, enter cricket stats, simulate realistic results, and crown Daily Fantasy Winners!
                 </p>
               </div>
 

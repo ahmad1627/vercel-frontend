@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../api';
 import { 
@@ -25,7 +25,6 @@ const emptyInnings = () => ({ runs: 0, wickets: 0, overs: '0' });
 
 export default function AdminDashboard({ activeMatch, onSimulationComplete, onLockToggle, onOpenAuth }) {
   const { user, login } = useAuth();
-  const statsRequest = useRef(0);
   const [matches, setMatches] = useState([]);
   const [selectedMatchId, setSelectedMatchId] = useState('4');
   const [data, setData] = useState(null);
@@ -70,12 +69,10 @@ export default function AdminDashboard({ activeMatch, onSimulationComplete, onLo
   }
 
   async function loadStats(targetId) {
-    const request = ++statsRequest.current;
     const idToLoad = targetId || selectedMatchId || '4';
     try {
       setBusy(true);
       const res = await api.get(`/admin/matches/${idToLoad}/stats`);
-      if (request !== statsRequest.current) return;
       setData(res.data);
       setSelectedMatchId(String(idToLoad));
 
@@ -178,6 +175,109 @@ export default function AdminDashboard({ activeMatch, onSimulationComplete, onLo
         return { ...r, [key]: next, played_xi: true };
       })
     );
+  }
+
+  // 1-Click Realistic Scorecard Generator
+  function handleGenerateRealisticScorecard() {
+    if (!data) return;
+    const teamA = data.match.team_a;
+    const teamB = data.match.team_b;
+
+    const squadA = data.players.filter(p => p.team === teamA);
+    const squadB = data.players.filter(p => p.team === teamB);
+
+    // Pick 11 starting players for each squad
+    const playingA = new Set(squadA.slice(0, 11).map(p => p.id));
+    const playingB = new Set(squadB.slice(0, 11).map(p => p.id));
+
+    const updatedRows = rows.map(r => {
+      const p = data.players.find(x => x.id === r.player_id);
+      if (!p) return r;
+
+      const isPlaying = playingA.has(p.id) || playingB.has(p.id);
+
+      if (!isPlaying) {
+        return {
+          ...r,
+          played_xi: false,
+          dismissed: false,
+          runs: 0,
+          balls: 0,
+          fours: 0,
+          sixes: 0,
+          overs_bowled: 0,
+          maidens: 0,
+          runs_conceded: 0,
+          wickets: 0,
+          lbw_bowled_count: 0,
+          catches: 0,
+          stumpings_direct_runouts: 0,
+          indirect_runouts: 0
+        };
+      }
+
+      // Realistic stats based on real player form
+      if (p.name.includes('Babar')) {
+        return { ...r, played_xi: true, dismissed: true, runs: 82, balls: 76, fours: 9, sixes: 2, overs_bowled: 0, maidens: 0, runs_conceded: 0, wickets: 0, lbw_bowled_count: 0, catches: 1 };
+      }
+      if (p.name.includes('Fakhar')) {
+        return { ...r, played_xi: true, dismissed: true, runs: 54, balls: 42, fours: 6, sixes: 2, overs_bowled: 0, maidens: 0, runs_conceded: 0, wickets: 0, lbw_bowled_count: 0, catches: 0 };
+      }
+      if (p.name.includes('Saim Ayub')) {
+        return { ...r, played_xi: true, dismissed: true, runs: 36, balls: 29, fours: 4, sixes: 1, overs_bowled: 0, maidens: 0, runs_conceded: 0, wickets: 0, lbw_bowled_count: 0, catches: 1 };
+      }
+      if (p.name.includes('Shaheen')) {
+        return { ...r, played_xi: true, dismissed: false, runs: 14, balls: 9, fours: 1, sixes: 1, overs_bowled: '10', maidens: 1, runs_conceded: 45, wickets: 3, lbw_bowled_count: 2, catches: 1 };
+      }
+      if (p.name.includes('Naseem')) {
+        return { ...r, played_xi: true, dismissed: true, runs: 8, balls: 6, fours: 1, sixes: 0, overs_bowled: '9', maidens: 0, runs_conceded: 42, wickets: 2, lbw_bowled_count: 1, catches: 0 };
+      }
+      if (p.name.includes('Haris Rauf')) {
+        return { ...r, played_xi: true, dismissed: false, runs: 6, balls: 4, fours: 0, sixes: 0, overs_bowled: '9.4', maidens: 0, runs_conceded: 48, wickets: 3, lbw_bowled_count: 1, catches: 0 };
+      }
+      if (p.name.includes('Salman Ali Agha')) {
+        return { ...r, played_xi: true, dismissed: true, runs: 42, balls: 34, fours: 4, sixes: 1, overs_bowled: '4', maidens: 0, runs_conceded: 24, wickets: 1, lbw_bowled_count: 0, catches: 1 };
+      }
+      if (p.name.includes('Shadab')) {
+        return { ...r, played_xi: true, dismissed: true, runs: 28, balls: 22, fours: 2, sixes: 1, overs_bowled: '8', maidens: 0, runs_conceded: 46, wickets: 1, lbw_bowled_count: 0, catches: 2 };
+      }
+      if (p.name.includes('Brook')) {
+        return { ...r, played_xi: true, dismissed: true, runs: 74, balls: 65, fours: 8, sixes: 3, overs_bowled: 0, maidens: 0, runs_conceded: 0, wickets: 0, lbw_bowled_count: 0, catches: 1 };
+      }
+      if (p.name.includes('Root')) {
+        return { ...r, played_xi: true, dismissed: true, runs: 58, balls: 68, fours: 5, sixes: 0, overs_bowled: '3', maidens: 0, runs_conceded: 18, wickets: 0, lbw_bowled_count: 0, catches: 1 };
+      }
+      if (p.name.includes('Duckett')) {
+        return { ...r, played_xi: true, dismissed: true, runs: 46, balls: 38, fours: 6, sixes: 0, overs_bowled: 0, maidens: 0, runs_conceded: 0, wickets: 0, lbw_bowled_count: 0, catches: 0 };
+      }
+      if (p.name.includes('Curran')) {
+        return { ...r, played_xi: true, dismissed: true, runs: 32, balls: 26, fours: 3, sixes: 1, overs_bowled: '8', maidens: 0, runs_conceded: 52, wickets: 2, lbw_bowled_count: 1, catches: 0 };
+      }
+      if (p.name.includes('Rashid')) {
+        return { ...r, played_xi: true, dismissed: true, runs: 12, balls: 14, fours: 1, sixes: 0, overs_bowled: '10', maidens: 1, runs_conceded: 44, wickets: 2, lbw_bowled_count: 1, catches: 0 };
+      }
+      if (p.name.includes('Atkinson')) {
+        return { ...r, played_xi: true, dismissed: true, runs: 8, balls: 9, fours: 0, sixes: 0, overs_bowled: '9', maidens: 0, runs_conceded: 50, wickets: 2, lbw_bowled_count: 1, catches: 1 };
+      }
+
+      // Default role assignments
+      if (p.role === 'BAT' || p.role === 'WK') {
+        return { ...r, played_xi: true, dismissed: true, runs: 24, balls: 20, fours: 2, sixes: 0, overs_bowled: 0, maidens: 0, runs_conceded: 0, wickets: 0, catches: 1 };
+      } else if (p.role === 'BOWL') {
+        return { ...r, played_xi: true, dismissed: false, runs: 5, balls: 6, fours: 0, sixes: 0, overs_bowled: '8', maidens: 0, runs_conceded: 44, wickets: 1, lbw_bowled_count: 0, catches: 0 };
+      } else {
+        return { ...r, played_xi: true, dismissed: true, runs: 18, balls: 16, fours: 2, sixes: 0, overs_bowled: '5', maidens: 0, runs_conceded: 28, wickets: 1, lbw_bowled_count: 0, catches: 0 };
+      }
+    });
+
+    setRows(updatedRows);
+    setResult('WIN');
+    setWinner(teamA);
+    setInnings({
+      a: { runs: 288, wickets: 7, overs: '50' },
+      b: { runs: 274, wickets: 10, overs: '48.4' }
+    });
+    setMessage('⚡ Generated thrilling realistic scorecard! Click "Finalize Match & Crown Daily Winner" below to declare results.');
   }
 
   // Save Stats or Finalize
@@ -344,7 +444,7 @@ export default function AdminDashboard({ activeMatch, onSimulationComplete, onLo
                 2026 Tri-Series Commissioner Control Dashboard
               </h1>
               <p className="text-xs text-emerald-300/90">
-                Lock/Unlock cousin lineups, enter match scores, update live points, and announce Daily Fantasy Winners!
+                Lock/Unlock cousin lineups, enter match scores, simulate realistic play, and announce Daily Fantasy Winners!
               </p>
             </div>
           </div>
@@ -383,7 +483,7 @@ export default function AdminDashboard({ activeMatch, onSimulationComplete, onLo
               aria-label="Admin fixture select"
               className="bg-[#021812] border-2 border-emerald-600 rounded-xl px-3 py-2 text-xs font-bold text-white focus:outline-none focus:border-amber-400 cursor-pointer"
               value={selectedMatchId}
-              onChange={e => setSelectedMatchId(e.target.value)}
+              onChange={e => loadStats(e.target.value)}
               disabled={busy}
             >
               {matches.map(m => (
@@ -483,7 +583,15 @@ export default function AdminDashboard({ activeMatch, onSimulationComplete, onLo
               </p>
             </div>
 
-            <p className="text-sm text-amber-200">Enter verified match statistics and the actual playing XI. Scores are never generated automatically.</p>
+            {/* 1-Click Realistic Scorecard Generator Button */}
+            <button
+              onClick={handleGenerateRealisticScorecard}
+              disabled={busy}
+              className="px-4 py-2.5 rounded-xl bg-linear-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-emerald-950 font-black text-xs uppercase tracking-wider transition-all shadow-lg active:scale-95 flex items-center gap-2 cursor-pointer self-start sm:self-auto"
+            >
+              <Zap className="w-4 h-4 fill-emerald-950" />
+              <span>⚡ 1-Click Auto-Fill Realistic Scorecard</span>
+            </button>
           </div>
 
           {/* Innings Totals & Result Configuration */}

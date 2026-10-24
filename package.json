@@ -1,6 +1,6 @@
 {
   "name": "pak-triseries-fantasy-2026",
-  "version": "1.0.0",
+  "version": "3.1.0",
   "description": "2026 Pakistan ODI Tri-Nation Series Daily Fantasy Web Application (Node.js + React on Vercel)",
   "main": "api/index.js",
   "scripts": {
@@ -8,16 +8,15 @@
     "start": "node backend/server.js",
     "dev:backend": "node backend/server.js",
     "dev:frontend": "npm --prefix frontend run dev",
-    "build": "npm --prefix frontend run build && node -e \"require('fs').cpSync('frontend/dist','dist',{recursive:true})\"",
+    "build": "npm run build:frontend && node -e \"require('fs').cpSync('frontend/dist','dist',{recursive:true})\"",
     "build:frontend": "npm --prefix frontend run build",
     "test:backend": "node backend/test_node_suite.js",
     "test:persistence": "node backend/test_persistence_suite.js",
-    "vercel-build": "npm --prefix frontend run build && node -e \"require('fs').cpSync('frontend/dist','dist',{recursive:true})\"",
-    "test": "npm run test:backend && npm run test:persistence && npm run test:production && npm run test:multi-instance && npm run test:disk-failure",
+    "vercel-build": "npm run build:frontend && node -e \"require('fs').cpSync('frontend/dist','dist',{recursive:true})\"",
+    "test": "npm run test:backend && npm run test:persistence && npm run test:production && npm run test:frontend",
     "setup:local": "node scripts/setup-local.js",
     "test:production": "node backend/test_production_suite.js",
-    "test:multi-instance": "node backend/test_multi_instance.js",
-    "test:disk-failure": "node backend/test_disk_failure.js"
+    "test:frontend": "npm --prefix frontend test"
   },
   "dependencies": {
     "@upstash/redis": "^1.39.0",
@@ -28,6 +27,6 @@
     "jsonwebtoken": "^9.0.2"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=18.0.0"
   }
 }

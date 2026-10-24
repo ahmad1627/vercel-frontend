@@ -2,13 +2,13 @@ services:
   - type: web
     name: family-fantasy-cricket
     runtime: node
-    plan: free
-    buildCommand: npm ci && npm --prefix frontend ci && npm --prefix frontend run build
+    buildCommand: npm ci && npm --prefix frontend ci && npm run build
     startCommand: npm start
-    healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
         value: production
+      - key: REQUIRE_REDIS
+        value: true
       - key: JWT_SECRET
         generateValue: true
       - key: ADMIN_EMAIL

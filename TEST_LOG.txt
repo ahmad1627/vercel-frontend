@@ -1,0 +1,189 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> pak-triseries-fantasy-2026@3.1.0 test
+> npm run test:backend && npm run test:persistence && npm run test:production && npm run test:frontend
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> pak-triseries-fantasy-2026@3.1.0 test:backend
+> node backend/test_node_suite.js
+
+[Node Database] Initial game state prepared.
+PASS: API health
+PASS: Concurrent registrations all committed
+PASS: Registration does not falsely verify email
+PASS: Non-admin forbidden
+PASS: Past scheduled deadline blocks team submission
+PASS: Squads editable before submissions
+PASS: Admin squad changes accepted
+PASS: String/numeric duplicate rejected
+PASS: Numeric duplicate rejected
+PASS: Concurrent team saves committed
+PASS: Squad changes blocked after submissions
+PASS: Public leaderboard omits emails
+PASS: Other lineup hidden before deadline
+PASS: Owner can inspect own lineup
+PASS: Non-admin cannot remove team
+PASS: Admin can permanently remove team
+PASS: Removed team disappears from leaderboard
+PASS: 150KB avatar payload accepted
+PASS: Unsafe avatar URL rejected
+PASS: Malformed input returns JSON 400
+[Node Database] Initial game state prepared.
+PASS: Account and lineup survive restart
+PASS: Manual lock works
+PASS: Locked team edits blocked
+PASS: Lineups visible after lock
+PASS: Manual statistics saved
+PASS: Manual stats calculate fantasy totals
+PASS: Stale admin scorecard rejected
+PASS: Real match result finalized
+PASS: NRR calculated from innings; all-out uses full quota
+PASS: Equal scores share rank
+PASS: Completed result can be corrected
+PASS: Correction recalculates team points
+PASS: Correction does not double-count standings
+PASS: All seven fixtures complete; tied champions supported
+PASS: Partial-over economy is correct
+PASS: Non-playing player gets zero
+PASS: Invalid cricket overs rejected
+PASS: Admin password recovery
+PASS: Old sessions revoked after password reset
+PASS: Recovered user can sign in
+PASS: Unverified social sign-in remains disabled
+PASS: Explicit admin reset
+[Node Database] Initial game state prepared.
+PASS: Reset removes all old lineups durably
+PASS: Repeated login attempts rate limited
+SUCCESS: 44 regression checks (local disk persistence).
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> pak-triseries-fantasy-2026@3.1.0 test:persistence
+> node backend/test_persistence_suite.js
+
+[Node Database] Initial game state prepared.
+PASS: API health
+PASS: Concurrent registrations all committed
+PASS: Registration does not falsely verify email
+PASS: Non-admin forbidden
+PASS: Past scheduled deadline blocks team submission
+PASS: Squads editable before submissions
+PASS: Admin squad changes accepted
+PASS: String/numeric duplicate rejected
+PASS: Numeric duplicate rejected
+PASS: Concurrent team saves committed
+PASS: Squad changes blocked after submissions
+PASS: Public leaderboard omits emails
+PASS: Other lineup hidden before deadline
+PASS: Owner can inspect own lineup
+PASS: Non-admin cannot remove team
+PASS: Admin can permanently remove team
+PASS: Removed team disappears from leaderboard
+PASS: 150KB avatar payload accepted
+PASS: Unsafe avatar URL rejected
+PASS: Malformed input returns JSON 400
+[Node Database] Initial game state prepared.
+PASS: Account and lineup survive restart
+PASS: Manual lock works
+PASS: Locked team edits blocked
+PASS: Lineups visible after lock
+PASS: Manual statistics saved
+PASS: Manual stats calculate fantasy totals
+PASS: Stale admin scorecard rejected
+PASS: Real match result finalized
+PASS: NRR calculated from innings; all-out uses full quota
+PASS: Equal scores share rank
+PASS: Completed result can be corrected
+PASS: Correction recalculates team points
+PASS: Correction does not double-count standings
+PASS: All seven fixtures complete; tied champions supported
+PASS: Partial-over economy is correct
+PASS: Non-playing player gets zero
+PASS: Invalid cricket overs rejected
+PASS: Admin password recovery
+PASS: Old sessions revoked after password reset
+PASS: Recovered user can sign in
+PASS: Unverified social sign-in remains disabled
+PASS: Lost write lease never reports success
+PASS: Redis outage fails closed
+PASS: Explicit admin reset
+[Node Database] Initial game state prepared.
+PASS: Reset removes all old lineups durably
+PASS: Repeated login attempts rate limited
+SUCCESS: 46 regression checks (Redis mock with contention).
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> pak-triseries-fantasy-2026@3.1.0 test:production
+> node backend/test_production_suite.js
+
+PASS: disk: no fabricated admin teams
+PASS: disk: concurrent production signups
+PASS: disk: registration creates no placeholder lineups
+PASS: disk: concurrent production team saves
+PASS: disk: all saved teams visible to independent guest
+PASS: disk: captain privacy before lock
+PASS: disk: production lineup privacy
+PASS: disk: exact saved XI can be read
+PASS: disk: no entries fabricated for future matches
+PASS: disk: sign in after full process restart
+PASS: disk: saved XI survives full process restart
+PASS: disk: a user ID cannot delete a different team
+PASS: disk: deleted lineup stays deleted across reads
+PASS: disk: removed team is not silently recreated
+PASS: disk: refreshed session can read team after password reset
+PASS: disk: revoked session cannot read private lineup
+PASS: redis: no fabricated admin teams
+PASS: redis: concurrent production signups
+PASS: redis: registration creates no placeholder lineups
+PASS: redis: concurrent production team saves
+PASS: redis: all saved teams visible to independent guest
+PASS: redis: captain privacy before lock
+PASS: redis: production lineup privacy
+PASS: redis: exact saved XI can be read
+PASS: redis: no entries fabricated for future matches
+PASS: redis: production conflict cannot bypass atomic commit
+PASS: redis: failed write preserves previous team
+PASS: redis: outage never reports successful save
+PASS: redis: a user ID cannot delete a different team
+PASS: redis: deleted lineup stays deleted across reads
+PASS: redis: removed team is not silently recreated
+PASS: redis: refreshed session can read team after password reset
+PASS: redis: revoked session cannot read private lineup
+PASS: Vercel without Redis fails closed
+SUCCESS: 34 production checks.
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> pak-triseries-fantasy-2026@3.1.0 test:frontend
+> npm --prefix frontend test
+
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> fantasy-cricket-frontend@1.0.0 test
+> vitest run
+
+
+ RUN  v3.2.7 /workspace/scratch/884e5a7354bb/review/frontend
+
+ ✓ src/components/Leaderboard.test.jsx (4 tests) 602ms
+stderr | src/App.test.jsx > does not label a failed save as saved
+Failed to save team: { response: { data: { detail: 'Database unavailable' } } }
+
+stderr | src/App.test.jsx > rejects success when the read-back has no saved team
+Failed to save team: Error: The saved team could not be verified. Reload before retrying.
+    at handleSaveTeam (/workspace/scratch/884e5a7354bb/review/frontend/src/App.jsx:463:15)
+    at runNextTicks (node:internal/process/task_queues:65:5)
+    at processTimers (node:internal/timers:615:9)
+
+ ✓ src/App.test.jsx (6 tests) 2971ms
+   ✓ keeps an account draft unsaved and never automatically posts it  339ms
+   ✓ does not carry another account draft across sign-in changes  487ms
+   ✓ shows success only after reading the saved team back  650ms
+   ✓ does not label a failed save as saved  504ms
+   ✓ rejects success when the read-back has no saved team  546ms
+   ✓ pauses saving on a saved-team load failure and retries successfully  442ms
+
+ Test Files  2 passed (2)
+      Tests  10 passed (10)
+   Start at  00:05:09
+   Duration  6.51s (transform 991ms, setup 0ms, collect 2.50s, tests 3.57s, environment 2.30s, prepare 429ms)
+

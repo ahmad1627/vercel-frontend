@@ -57,18 +57,3 @@
 }
 
 button:not(:disabled), summary { cursor: pointer; }
-
-/* Comfortable touch targets and accessible keyboard navigation. */
-button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid #fbbf24; outline-offset: 3px; }
-button:disabled { opacity: .55; cursor: not-allowed; }
-.fixture-strip > * { flex: 0 0 170px; scroll-snap-align: start; }
-.team-builder input { min-height: 44px; }
-.team-builder button { touch-action: manipulation; }
-@media (max-width: 640px) {
-  main { padding-left: 12px !important; padding-right: 12px !important; }
-  input, select { font-size: 16px !important; }
-  .team-builder { padding: 14px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
-}

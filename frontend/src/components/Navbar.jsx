@@ -11,16 +11,16 @@ const Navbar = ({ activeTab, setActiveTab, onOpenAuth, onOpenProfile, onOpenRule
         <div className="flex items-center justify-between h-16">
           
           {/* Brand Logo */}
-          <div className="flex shrink-0 items-center gap-2 cursor-pointer" onClick={() => setActiveTab('builder')}>
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('builder')}>
             <div className="w-10 h-10 rounded-xl bg-linear-to-br from-amber-400 via-amber-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-amber-500/20">
               <Trophy className="w-5 h-5 text-emerald-950 stroke-[2.5]" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-extrabold text-lg tracking-tight text-white flex items-center gap-1.5">
-                  TRI-SERIES <span className="hidden xl:inline text-amber-400">2026</span>
+                  TRI-SERIES <span className="text-amber-400">2026</span>
                 </span>
-                <span className="hidden xl:inline text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded tracking-wider uppercase">
+                <span className="text-[10px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded tracking-wider uppercase">
                   ODI
                 </span>
               </div>
@@ -31,7 +31,7 @@ const Navbar = ({ activeTab, setActiveTab, onOpenAuth, onOpenProfile, onOpenRule
           </div>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden lg:flex items-center gap-1.5">
+          <nav className="hidden md:flex items-center gap-1.5">
             <button
               onClick={() => setActiveTab('builder')}
               className={`px-3.5 py-1.5 rounded-lg text-sm font-black transition-all flex items-center gap-1.5 ${
@@ -41,7 +41,7 @@ const Navbar = ({ activeTab, setActiveTab, onOpenAuth, onOpenProfile, onOpenRule
               }`}
             >
               <Shield className="w-4 h-4 stroke-[2.5]" />
-              <span>Build Team</span>
+              <span>Build Team (Game 4)</span>
             </button>
 
             {/* My Team Tab button if logged in */}
@@ -120,11 +120,11 @@ const Navbar = ({ activeTab, setActiveTab, onOpenAuth, onOpenProfile, onOpenRule
           </nav>
 
           {/* User Profile / Auth State */}
-          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {/* Quick Mobile "Build 11" CTA Button */}
             <button
               onClick={() => setActiveTab('builder')}
-              className={`px-3 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider shadow-lg flex items-center gap-1.5 active:scale-95 hidden border transition-all ${
+              className={`px-3 py-1.5 rounded-xl font-black text-xs uppercase tracking-wider shadow-lg flex items-center gap-1.5 active:scale-95 md:hidden border transition-all ${
                 activeTab === 'builder'
                   ? 'bg-amber-400 text-emerald-950 border-amber-300 ring-2 ring-amber-400/40'
                   : 'bg-linear-to-r from-amber-400 to-amber-500 text-emerald-950 border-amber-300 hover:brightness-110'
@@ -135,7 +135,7 @@ const Navbar = ({ activeTab, setActiveTab, onOpenAuth, onOpenProfile, onOpenRule
             </button>
             {user ? (
               <div className="flex items-center gap-2.5">
-                <div className="hidden xl:flex flex-col items-end cursor-pointer" onClick={onOpenProfile}>
+                <div className="hidden sm:flex flex-col items-end cursor-pointer" onClick={onOpenProfile}>
                   <span className="text-xs font-bold text-amber-300 flex items-center gap-1">
                     {user.is_admin ? (
                       <span className="bg-amber-400 text-emerald-950 text-[9px] font-black px-1.5 py-0.2 rounded uppercase">
@@ -173,7 +173,7 @@ const Navbar = ({ activeTab, setActiveTab, onOpenAuth, onOpenProfile, onOpenRule
                 <button
                   onClick={logout}
                   title="Sign Out"
-                  className="min-h-11 min-w-11 flex items-center justify-center rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                  className="p-2 rounded-lg text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
@@ -181,11 +181,10 @@ const Navbar = ({ activeTab, setActiveTab, onOpenAuth, onOpenProfile, onOpenRule
             ) : (
               <button
                 onClick={onOpenAuth}
-                aria-label="Sign In / Register"
                 className="flex items-center gap-2 bg-linear-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-emerald-950 px-4 py-2 rounded-lg font-bold text-xs uppercase tracking-wider transition-all shadow-md shadow-amber-500/20 active:scale-95"
               >
                 <LogIn className="w-4 h-4 stroke-[2.5]" />
-                <span className="hidden sm:inline">Sign In / Register</span><span className="sm:hidden">Sign In</span>
+                Sign In / Register
               </button>
             )}
           </div>

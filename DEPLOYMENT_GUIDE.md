@@ -1,79 +1,117 @@
-# Deploy the repaired fantasy league
+# Deploy the corrected project (3.1.0)
 
-## 1. Protect existing teams first
+This ZIP contains the corrected React + Express application. It does not change
+an existing Vercel deployment until you upload/commit and deploy these sources.
+The previously inspected live API reported version 3.0.0; the input archive was
+2.3.0. This release repairs the archive. It is not a merge against the unseen
+3.0.0 source; compare any additional custom changes before replacing that source.
 
-1. Make a backup/export of your current Upstash database before updating the site. Keep the original upload/version as a code backup.
-2. Rotate the Redis REST credential embedded in the old project. Do not delete the database or its tournament key.
-3. Retain the same database and `GAME_NAMESPACE`. The unchanged default key is `fantasy-cricket:tri-series:2026`. Pointing at a different database/key produces a separate tournament, not recovered data.
-4. Do not press Reset Tournament. It intentionally deletes all lineups and points.
-5. This archive contains source code, not an export of your live database. Previously lost server records cannot be recovered from this archive. Browser drafts are not proof of a submitted team.
+## Keep existing accounts and teams
 
-## 2. Upload the entire project to your repository
+1. Export/backup the existing Redis game state before deployment.
+2. Keep the SAME Redis database, JWT_SECRET, and GAME_NAMESPACE. Do not reset the
+   tournament or change the namespace to fix missing teams. The default key is
+   `fantasy-cricket:tri-series:2026`. If the deployed 3.0.0 code uses a different
+   key, set GAME_NAMESPACE to that existing key before deploying this release.
+3. Replace source files with this release, keeping your environment variables.
+   Do not upload node_modules, local data, .env, or the ZIP itself to the repo.
+4. Rotate the Redis token that was embedded in the old archive, then put the
+   replacement token in the Vercel environment. No database token is embedded
+   in this release. Do not put credentials in any VITE_ variable.
+5. Remove obsolete Python deployment commands. The supplied deployment files
+   now all run the Node backend. Python source is not included in this release.
 
-Extract the ZIP. Upload the CONTENTS of the `fantasy-cricket-fixed` folder to the repository root. Replace old source files; remove the obsolete Python backend files/configuration. Include `package.json`, `package-lock.json`, `vercel.json`, `api`, `backend`, and `frontend`.
+## Vercel configuration
 
-Do not upload `.env`, live data, or `node_modules`. Clean dependencies are installed during deployment. The package intentionally excludes operating-system-specific installed dependencies and stale build output.
+Deploy the entire project as ONE Vercel project. Use the root folder containing
+package.json, vercel.json, api/, backend/, and frontend/. Do not set the Root
+Directory to frontend/. The included vercel.json specifies:
 
-## 3. Vercel configuration
+- Install command: `npm ci && npm --prefix frontend ci`
+- Build command: `npm run build`
+- Output directory: `dist`
+- API routing: `/api/*` to the Express function
 
-Import the repository. Set Root Directory to the repository root (`./`), not `frontend` or `backend`. Use a supported Node.js runtime of 22 or newer. `vercel.json` supplies install, build, output and routing settings.
+Set these server environment variables for the production deployment:
 
-Set these environment variables on the backend project for Production (and Preview only if you deliberately want it to access that database):
-
-| Variable | Value |
+| Name | Value |
 | --- | --- |
-| `JWT_SECRET` | A private random secret, minimum 32 characters |
-| `ADMIN_EMAIL` | Your administrator email |
-| `ADMIN_PASSWORD` | A strong private password, minimum 10 characters |
-| `UPSTASH_REDIS_REST_URL` | Your existing Upstash database's HTTPS REST URL |
-| `UPSTASH_REDIS_REST_TOKEN` | Its newly rotated REST token |
+| JWT_SECRET | Your existing secure secret; at least 32 characters |
+| ADMIN_EMAIL | Your administrator email |
+| ADMIN_PASSWORD | Strong initial administrator password; at least 10 characters |
+| UPSTASH_REDIS_REST_URL | REST URL of your existing Redis database |
+| UPSTASH_REDIS_REST_TOKEN | Newly rotated REST token of that database |
+| GAME_NAMESPACE | Existing game key, if different from the default above |
 
-Generate a secret locally with:
+Remove stale VITE_API_URL / VITE_API_BASE_URL overrides unless you intentionally
+use a separate API. The default frontend uses /api on the same domain.
 
-```sh
-node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+ADMIN_PASSWORD seeds a new empty database only. It does not override the stored
+password on every login. Existing accounts retain their passwords. Change any
+old default admin password through the authenticated account recovery controls.
+The old publicly known default password is not accepted as a special login.
+
+Deploy the new version. Open `/api/health` on your domain. Expected version:
+`3.1.0`, commit label `verified-server-saves`, and is_cloud_persisted: true.
+Missing Redis/security configuration returns 503; hosted saves never use /tmp.
+
+## Final live acceptance test
+
+1. Sign in with a player account and select an OPEN fixture.
+2. Pick 11 players satisfying the displayed role/team limits, with different C/VC.
+3. Press Save. Success requires both a committed POST and a matching GET read-back.
+4. Reload, then sign out and back in: the XI and C/VC must be unchanged.
+5. Sign in to that player account from a second device/browser: verify the same XI.
+6. Check match and overall leaderboards from another browser. The saved entry must
+   be visible; a draft or an account without a submitted XI must not appear.
+7. Save a second player's team concurrently. Verify both teams remain present.
+8. Using a disposable fixture/account, test admin lock, score entry, and unlock.
+   Locked teams must reject edits; score changes must update the leaderboard.
+
+No production accounts or fixtures were modified during this code repair. These
+live acceptance checks, provider token rotation, and deployment remain necessary.
+
+## Local development and testing
+
+Install Node.js 22 or newer. In the project root:
+
+```
+npm ci
+npm --prefix frontend ci
+npm run setup:local
+npm run dev
 ```
 
-Keep values private. Do not put these secrets in variables beginning with `VITE_`.
+The setup command creates a local .env with a random secret/password. Keep it
+private. The Vite frontend uses http://localhost:5173 and proxies /api to port 5000.
+Local state defaults to api/data/game.json. LOCAL_DATA_FILE can override it.
+Without Redis, local disk saves survive process restarts; this mode is not
+suitable for an ephemeral hosting service. Docker/Render config requires Redis.
 
-For a single Vercel site, leave `VITE_API_URL` and `VITE_API_BASE_URL` unset: the browser calls `/api` on the same site. Remove an old frontend URL override if it points to another backend. Redeploy after changing environment variables.
+```
+npm test
+npm run build
+npm start
+```
 
-`ADMIN_PASSWORD` creates the owner on an empty database. It does not overwrite an existing stored password. For an existing account, use its current password and change it through the admin password-reset control. Configure `ADMIN_EMAIL` to the intended owner. Changing `JWT_SECRET` invalidates existing sessions, so users must sign in again.
+After building, npm start serves the application at http://localhost:5000.
+Tests use isolated temporary data and mock Redis; they do not touch live Redis.
 
-Use a separate database/namespace for staging; never run tests against the live database. Test scripts use isolated data and emulators and should not be modified to use production credentials.
+## Behaviour and limits
 
-## 4. Required live acceptance check
-
-This work did not access your live Upstash account or deployment. Complete these checks on the actual deployed site before the game:
-
-1. Open `/api/health`. Require HTTP 200 with `database.is_cloud_persisted: true`. A 503 must be fixed; it is not safe to play with unconfirmed writes.
-2. Sign in as admin. Verify the squads and actual fixture start times. Times display in each visitor's browser timezone; the server compares the absolute timestamp.
-3. Create two ordinary accounts. Save valid teams for an open fixture on different devices/networks.
-4. Verify both entries on that fixture's leaderboard. Open a private window and sign in again: the exact XI, captain and vice-captain must load.
-5. Redeploy the same code with the SAME database and namespace. Check both teams again.
-6. Edit a team on one device; attempt an older edit on another. Expect a conflict and a reload instruction, not an overwrite.
-7. Lock the fixture as admin. Confirm users cannot edit, and others can inspect the saved teams.
-8. Enter verified score data; confirm both team totals and ranks update. For finalization, explicitly mark the real 11 players per side.
-
-Use a staging tournament for destructive checks. Do not reset real entries or enter invented statistics in the live league.
-
-## 5. Operating the game
-
-- Give every cousin the same site link. Each person should use their own account; signing into the same account on another device retrieves that account's team.
-- A draft exists only on that browser. A green “Saved online” confirmation follows a successful server commit.
-- On a save error, keep the tab open. The draft is retained locally. Reload the saved team to establish whether the save committed before retrying. A timed-out response can be ambiguous even when a server commit succeeded.
-- A user who has not saved a complete XI is not entered. Empty rows created by the old application are ignored.
-- Administrator team removal removes that manager's tournament entries; the account remains. They may submit again for an open fixture. Removal is not an account ban.
-- To recover a password, verify the person's identity yourself, then use the administrator password tool. It invalidates old sessions and retains their teams. Automatic email reset is not configured.
-- Confirm each match's statistics manually from a reliable scorecard. Finalization recalculates all teams, advances the fixture, and updates standings; correcting an earlier result does not rewind the active fixture.
-- Keep periodic provider backups. Persistent storage still depends on a healthy provider account, retained keys, and your backup policy; no software can promise that data can never be lost.
-
-## Other hosting
-
-`render.yaml`, `Dockerfile`, and `Procfile` now run Node, not the removed Python application. Configure the same five environment variables. Set `NODE_ENV=production`. Keep Redis as the shared store; do not use container disk for production teams.
-
-If hosting the frontend separately, set its `VITE_API_URL` to the backend's HTTPS `/api` URL and set backend `FRONTEND_URL` to the exact frontend origin. Multiple trusted origins can be comma-separated. Rebuild the frontend after changing Vite variables.
-
-## Scale and limitations
-
-This architecture uses a locked Redis snapshot for consistency in a small family league. It is not benchmarked as a large public fantasy platform. Large player populations, very large avatars, high request volume, automatic sports feeds, or paid contests require a different storage/operations design and load testing. DLS/reduced-over NRR is not implemented. Retained historical fixture results and players must be verified by the administrator before real-world use.
+- Browser drafts are scoped by account and match, and remain labelled Draft.
+- Pressing Save while signed out prompts sign-in. An explicit guest draft can
+  carry into sign-in, but you must press Save again to submit it.
+- The server's saved XI is authoritative after reload/sign-in. Unsaved edits
+  to an existing saved team are not a replacement for that committed XI.
+- Legacy empty placeholder teams remain in storage but are not ranked as lineups.
+  Old browser-only entries are ignored. Missing server data cannot be recovered
+  from another user's browser without an explicit resubmission before deadline.
+- Pre-deadline player selections are private to the owner and administrator.
+- Admin Remove deletes the selected match lineup only; other fixtures remain.
+- Match points come from administrator-entered scorecards. No paid/live feed is
+  included. Review seeded squads, dates and results against your actual event.
+- Scoring is custom ODI scoring, not an official ICC fantasy standard.
+- Snapshot persistence targets a small family tournament; it is not a load-tested
+  commercial platform. Redis backups and provider availability remain important.
+- Email verification, OAuth and DLS/reduced-over calculations are not implemented.
