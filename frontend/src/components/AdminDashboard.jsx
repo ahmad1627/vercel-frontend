@@ -186,9 +186,20 @@ export default function AdminDashboard({ activeMatch, onSimulationComplete, onLo
     const squadA = data.players.filter(p => p.team === teamA);
     const squadB = data.players.filter(p => p.team === teamB);
 
-    // Pick 11 starting players for each squad
-    const playingA = new Set(squadA.slice(0, 11).map(p => p.id));
-    const playingB = new Set(squadB.slice(0, 11).map(p => p.id));
+    // Pick realistic 11 starting players for each squad (including key bowlers Rauf, Atkinson, Afridi, Tongue)
+    const pakPlayingIds = new Set(
+      squadA
+        .filter(p => ['Babar Azam', 'Fakhar Zaman', 'Saim Ayub', 'Saad Baig', 'Salman Ali Agha', 'Shadab Khan', 'Faheem Ashraf', 'Shaheen Shah Afridi', 'Naseem Shah', 'Haris Rauf', 'Abrar Ahmed'].includes(p.name))
+        .map(p => p.id)
+    );
+    const engPlayingIds = new Set(
+      squadB
+        .filter(p => ['Tom Banton', 'Harry Brook', 'Joe Root', 'Ben Duckett', 'Sam Curran', 'Will Jacks', 'Liam Dawson', 'Jamie Overton', 'Adil Rashid', 'Gus Atkinson', 'Josh Tongue'].includes(p.name))
+        .map(p => p.id)
+    );
+
+    const playingA = pakPlayingIds.size === 11 ? pakPlayingIds : new Set(squadA.slice(0, 11).map(p => p.id));
+    const playingB = engPlayingIds.size === 11 ? engPlayingIds : new Set(squadB.slice(0, 11).map(p => p.id));
 
     const updatedRows = rows.map(r => {
       const p = data.players.find(x => x.id === r.player_id);
