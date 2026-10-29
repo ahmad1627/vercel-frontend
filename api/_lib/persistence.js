@@ -55,7 +55,18 @@ function persistence(req,res,next) {
     original=await redis.get(STATE_KEY);
     if(original==null){await redis.set(STATE_KEY,JSON.stringify(db.snapshot()),{nx:true});original=await redis.get(STATE_KEY);}
     db.restore(typeof original==='string'?JSON.parse(original):original);
-   } else if(!memoryOnly && fs.existsSync(localPath)) db.restore(JSON.parse(fs.readFileSync(localPath,'utf8')));
+    const restoredSnap = JSON.stringify(db.snapshot());
+    const origStr = typeof original==='string' ? original : JSON.stringify(original);
+    if (restoredSnap !== origStr) {
+      await redis.set(STATE_KEY, restoredSnap).catch(() => {});
+      original = restoredSnap;
+    }
+   } else if(!memoryOnly && fs.existsSync(localPath)) {
+    db.restore(JSON.parse(fs.readFileSync(localPath,'utf8')));
+    const restoredSnap = JSON.stringify(db.snapshot());
+    fs.mkdirSync(path.dirname(localPath),{recursive:true});
+    const temp=localPath+'.tmp';fs.writeFileSync(temp,restoredSnap,{mode:0o600});fs.renameSync(temp,localPath);
+   }
    before=JSON.stringify(db.snapshot());
    let sending=false;
    res.json=body=>{

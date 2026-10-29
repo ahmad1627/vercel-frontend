@@ -106,6 +106,20 @@ class Database {
     // Restore stored state without creating teams, accounts, or changing results.
     this.nextUserId = Math.max(Number(this.nextUserId) || 100, ...this.users.map(u => u.id + 1));
     this.nextTeamId = Math.max(Number(this.nextTeamId) || 1, ...this.fantasyTeams.map(t => t.id + 1));
+
+    // Ensure Match 7 (The Final) is configured as Pakistan vs Sri Lanka (PAK vs SL)
+    for (const m of this.matches) {
+      if (m.match_number === 7 || m.id === 7) {
+        if (m.team_a === 'TBD' || !m.team_a) m.team_a = 'PAK';
+        if (m.team_b === 'TBD' || !m.team_b) m.team_b = 'SL';
+        if (!m.title || m.title.includes('TBD') || m.title.includes('Top 1')) {
+          m.title = 'The Final: Pakistan vs Sri Lanka';
+        }
+        if (m.status === 'TBD_FINAL') {
+          m.status = 'ACTIVE';
+        }
+      }
+    }
   }
 
   // --- Users ---

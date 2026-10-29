@@ -71,13 +71,25 @@ apiRouter.use('/admin', require('./admin'));
 apiRouter.get('/matches', (req, res) => {
   const matches = db.getMatches();
   const formatted = matches.map(m => {
+    let teamA = m.team_a;
+    let teamB = m.team_b;
+    let title = m.title;
+    if (m.match_number === 7 || m.id === 7 || teamA === 'TBD' || teamB === 'TBD') {
+      const standings = db.getStandings();
+      teamA = (m.team_a && m.team_a !== 'TBD') ? m.team_a : (standings[0] ? standings[0].team : 'PAK');
+      teamB = (m.team_b && m.team_b !== 'TBD') ? m.team_b : (standings[1] ? standings[1].team : 'SL');
+      title = 'The Final: Pakistan vs Sri Lanka';
+      m.team_a = teamA;
+      m.team_b = teamB;
+      m.title = title;
+    }
     const { isSelectable, statusBadge, lockStatusText } = formatMatchLockInfo(m);
     return {
       id: m.id,
       match_number: m.match_number,
-      title: m.title,
-      team_a: m.team_a,
-      team_b: m.team_b,
+      title,
+      team_a: teamA,
+      team_b: teamB,
       venue: m.venue,
       match_date: m.match_date,
       status: m.status,
@@ -100,13 +112,26 @@ apiRouter.get('/matches/active', (req, res) => {
     return res.status(404).json({ detail: 'No active match found' });
   }
 
+  let teamA = active.team_a;
+  let teamB = active.team_b;
+  let title = active.title;
+  if (active.match_number === 7 || active.id === 7 || teamA === 'TBD' || teamB === 'TBD') {
+    const standings = db.getStandings();
+    teamA = (active.team_a && active.team_a !== 'TBD') ? active.team_a : (standings[0] ? standings[0].team : 'PAK');
+    teamB = (active.team_b && active.team_b !== 'TBD') ? active.team_b : (standings[1] ? standings[1].team : 'SL');
+    title = 'The Final: Pakistan vs Sri Lanka';
+    active.team_a = teamA;
+    active.team_b = teamB;
+    active.title = title;
+  }
+
   const { isSelectable, statusBadge, lockStatusText } = formatMatchLockInfo(active);
   res.json({
     id: active.id,
     match_number: active.match_number,
-    title: active.title,
-    team_a: active.team_a,
-    team_b: active.team_b,
+    title,
+    team_a: teamA,
+    team_b: teamB,
     venue: active.venue,
     match_date: active.match_date,
     status: active.status,
@@ -131,11 +156,14 @@ apiRouter.get('/matches/:match_id/players', (req, res) => {
   let teamA = match.team_a;
   let teamB = match.team_b;
 
-  // Resolve TBD final match from standings
-  if (teamA === 'TBD' || teamB === 'TBD') {
+  // Resolve TBD final match from standings or defaults
+  if (teamA === 'TBD' || teamB === 'TBD' || match.match_number === 7 || match.id === 7) {
     const standings = db.getStandings();
-    teamA = standings[0] ? standings[0].team : 'PAK';
-    teamB = standings[1] ? standings[1].team : 'ENG';
+    teamA = (match.team_a && match.team_a !== 'TBD') ? match.team_a : (standings[0] ? standings[0].team : 'PAK');
+    teamB = (match.team_b && match.team_b !== 'TBD') ? match.team_b : (standings[1] ? standings[1].team : 'SL');
+    match.team_a = teamA;
+    match.team_b = teamB;
+    match.title = 'The Final: Pakistan vs Sri Lanka';
   }
 
   const players = db.getPlayersByTeams([teamA, teamB]);
@@ -240,8 +268,16 @@ apiRouter.post('/teams', authMiddleware, (req, res) => {
   }
 
   // Fetch players and validate team composition
-  const teamA = match.team_a;
-  const teamB = match.team_b;
+  let teamA = match.team_a;
+  let teamB = match.team_b;
+  if (teamA === 'TBD' || teamB === 'TBD' || match.match_number === 7 || match.id === 7) {
+    const standings = db.getStandings();
+    teamA = (match.team_a && match.team_a !== 'TBD') ? match.team_a : (standings[0] ? standings[0].team : 'PAK');
+    teamB = (match.team_b && match.team_b !== 'TBD') ? match.team_b : (standings[1] ? standings[1].team : 'SL');
+    match.team_a = teamA;
+    match.team_b = teamB;
+    match.title = 'The Final: Pakistan vs Sri Lanka';
+  }
   const teamCounts = { [teamA]: 0, [teamB]: 0 };
   const roleCounts = { WK: 0, BAT: 0, AR: 0, BOWL: 0 };
 

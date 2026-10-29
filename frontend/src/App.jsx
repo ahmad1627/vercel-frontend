@@ -222,14 +222,28 @@ function App() {
     try {
       const res = await api.get('/matches');
       setMatchesError('');
-      setMatches(res.data);
+      const normalizeMatch = (m) => {
+        if (!m) return m;
+        if (m.match_number === 7 || m.id === 7 || m.team_a === 'TBD' || m.team_b === 'TBD') {
+          return {
+            ...m,
+            team_a: (m.team_a && m.team_a !== 'TBD') ? m.team_a : 'PAK',
+            team_b: (m.team_b && m.team_b !== 'TBD') ? m.team_b : 'SL',
+            title: (!m.title || m.title.includes('TBD') || m.title.includes('Top 1')) ? 'The Final: Pakistan vs Sri Lanka' : m.title
+          };
+        }
+        return m;
+      };
+      const normalizedMatches = res.data.map(normalizeMatch);
+      setMatches(normalizedMatches);
 
       const actRes = await api.get('/matches/active');
-      setActiveMatch(actRes.data);
+      const normalizedActive = normalizeMatch(actRes.data);
+      setActiveMatch(normalizedActive);
       if (!selectedMatch) {
-        setSelectedMatch(actRes.data);
+        setSelectedMatch(normalizedActive);
       } else {
-        const updated = res.data.find((m) => m.id === selectedMatch.id);
+        const updated = normalizedMatches.find((m) => m.id === selectedMatch.id);
         if (updated) setSelectedMatch(prev=>JSON.stringify(prev)===JSON.stringify(updated)?prev:updated);
       }
     } catch (err) {
@@ -294,8 +308,10 @@ function App() {
   useEffect(() => {
     if (!selectedMatch) return;
     const errors = [];
-    const teamA = selectedMatch.team_a;
-    const teamB = selectedMatch.team_b;
+    const rawTeamA = selectedMatch.team_a;
+    const rawTeamB = selectedMatch.team_b;
+    const teamA = (rawTeamA && rawTeamA !== 'TBD') ? rawTeamA : 'PAK';
+    const teamB = (rawTeamB && rawTeamB !== 'TBD') ? rawTeamB : (selectedMatch?.id === 7 || selectedMatch?.match_number === 7 ? 'SL' : 'ENG');
 
     // Total Players
     if (selectedPlayers.length < 11) {
@@ -623,8 +639,8 @@ function App() {
                 selectedPlayers={selectedPlayers}
                 onTogglePlayer={handleTogglePlayer}
                 onOpenMobilePitch={() => setIsMobilePitchOpen(true)}
-                teamA={selectedMatch?.team_a || 'PAK'}
-                teamB={selectedMatch?.team_b || 'ENG'}
+                teamA={(selectedMatch?.team_a && selectedMatch.team_a !== 'TBD') ? selectedMatch.team_a : 'PAK'}
+                teamB={(selectedMatch?.team_b && selectedMatch.team_b !== 'TBD') ? selectedMatch.team_b : (selectedMatch?.id === 7 || selectedMatch?.match_number === 7 ? 'SL' : 'ENG')}
                 isLocked={isCurrentMatchLocked}
                 captainId={captainId}
                 viceCaptainId={viceCaptainId}
@@ -649,8 +665,8 @@ function App() {
                 onSaveTeam={handleSaveTeam}
                 validationErrors={validationErrors}
                 isSubmitting={isSubmitting || loadedScope !== scope || Boolean(loadError)}
-                teamA={selectedMatch?.team_a || 'PAK'}
-                teamB={selectedMatch?.team_b || 'ENG'}
+                teamA={(selectedMatch?.team_a && selectedMatch.team_a !== 'TBD') ? selectedMatch.team_a : 'PAK'}
+                teamB={(selectedMatch?.team_b && selectedMatch.team_b !== 'TBD') ? selectedMatch.team_b : (selectedMatch?.id === 7 || selectedMatch?.match_number === 7 ? 'SL' : 'ENG')}
                 isLocked={isCurrentMatchLocked}
                 selectedMatch={selectedMatch}
               />
@@ -703,8 +719,8 @@ function App() {
         onSaveTeam={handleSaveTeam}
         validationErrors={validationErrors}
         isSubmitting={isSubmitting || loadedScope !== scope || Boolean(loadError)}
-        teamA={selectedMatch?.team_a || 'PAK'}
-        teamB={selectedMatch?.team_b || 'ENG'}
+        teamA={(selectedMatch?.team_a && selectedMatch.team_a !== 'TBD') ? selectedMatch.team_a : 'PAK'}
+        teamB={(selectedMatch?.team_b && selectedMatch.team_b !== 'TBD') ? selectedMatch.team_b : (selectedMatch?.id === 7 || selectedMatch?.match_number === 7 ? 'SL' : 'ENG')}
         isLocked={isCurrentMatchLocked}
         selectedMatch={selectedMatch}
       />
