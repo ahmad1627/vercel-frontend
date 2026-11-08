@@ -1,9 +1,0 @@
-Build verification — 2026-11-03
-
-Not run: `npm run build` could not be completed because project npm dependencies were unavailable in the editing environment.
-
-Dependency install attempts:
-- Online `npm ci --ignore-scripts --no-audit --no-fund`: timed out.
-- Offline `npm ci --offline --ignore-scripts --no-audit --no-fund`: failed with ENOTCACHED (package tarball not present in npm cache).
-
-JavaScript syntax validation (`node -c`) passed for all API, backend shim, test and script JavaScript files. See TEST_REPORT.md for the dependency-free checks that passed and the suites that could not run.
